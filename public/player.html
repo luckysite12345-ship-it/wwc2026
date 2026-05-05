@@ -467,13 +467,15 @@ body, html {
 
                 break;
             case "STREAM_TOGGLE":
-                handleStreamToggle(data.payload.enabled);
+                const enabled = Boolean(data.payload?.enabled);
+                game.stream_enabled = enabled; // ✅ keep your global state in sync
+                handleStreamToggle(enabled);
                 break;
 
             // ✅ ADD THIS
             case "VIDEO_UPDATE":
                 updateVideo({ video_url: data.payload.video_url });
-                handleStreamToggle(game.stream_enabled);
+                handleStreamToggle(data.stream_enabled ?? false);
                 break;
         }
     }
@@ -587,7 +589,7 @@ body, html {
         game.status = gameStatus;
 
         updateControls(gameStatus, data.stream_enabled);
-        handleStreamToggle(data.stream_enabled);
+        applyGameRules();
         // =========================
         // 🔥 STATUS CHANGE DETECTION
         // =========================
@@ -623,6 +625,7 @@ body, html {
             lastStatus = gameStatus;
 
             fetchActiveEvent();
+            applyGameRules();
         }
     }
     function formatNumber(num) {
@@ -867,6 +870,7 @@ body, html {
 
             if(balance <= 0){
                 disableBetting("No balance. Contact your agent.");
+                applyGameRules();
             }
 
         } catch(err){
@@ -1015,27 +1019,12 @@ body, html {
             url += (url.includes("?") ? "&" : "?") + "autoplay=1&mute=1";
         }
 
-        // ✅ SAVE IT HERE
         currentVideo = url;
 
-        function updateVideo(data) {
-            const iframe = document.getElementById('videoFrame');
-
-            if (!data.video_url) return;
-
-            let url = data.video_url;
-
-            if (!url.includes("autoplay=1")) {
-                url += (url.includes("?") ? "&" : "?") + "autoplay=1&mute=1";
-            }
-
-            currentVideo = url;
-
-            // ✅ ONLY load video if stream is ON
-            if (game.stream_enabled) {
-                if (iframe.src !== url) {
-                    iframe.src = url;
-                }
+        // ✅ Only load if stream is enabled
+        if (game.stream_enabled) {
+            if (iframe.src !== url) {
+                iframe.src = url;
             }
         }
     }
@@ -1332,6 +1321,37 @@ body, html {
         document.getElementById('winMeron').textContent = 0;
         document.getElementById('winWala').textContent = 0;
         document.getElementById('winDraw').textContent = 0;
+    }
+    function applyGameRules() {
+        const balance = Number(document.getElementById('balance').textContent) || 0;
+        const status = game.status;
+        const streamEnabled = game.stream_enabled;
+
+        // ❌ HARD BLOCK (balance = 0)
+        if (balance === 0) {
+
+            // disable betting
+            document.querySelectorAll('.bet-btn').forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = 0.5;
+            });
+
+            // force video OFF
+            handleStreamToggle(false);
+
+            return;
+        }
+
+        // ✅ BETTING (based on game status ONLY)
+        const canBet = status === 'OPEN';
+
+        document.querySelectorAll('.bet-btn').forEach(btn => {
+            btn.disabled = !canBet;
+            btn.style.opacity = canBet ? 1 : 0.5;
+        });
+
+        // ✅ VIDEO (follow database)
+        handleStreamToggle(streamEnabled);
     }
     checkSession('player');   
     fetchGame();
