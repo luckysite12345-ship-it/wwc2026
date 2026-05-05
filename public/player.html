@@ -469,13 +469,13 @@ body, html {
             case "STREAM_TOGGLE":
                 const enabled = Boolean(data.payload?.enabled);
                 game.stream_enabled = enabled; // ✅ keep your global state in sync
-                handleStreamToggle(enabled);
+                
                 break;
 
             // ✅ ADD THIS
             case "VIDEO_UPDATE":
                 updateVideo({ video_url: data.payload.video_url });
-                handleStreamToggle(data.stream_enabled ?? false);
+                
                 break;
         }
     }
@@ -820,7 +820,7 @@ body, html {
             status.className = "status " + gameStatus;
             game.status = gameStatus;
             updateControls(gameStatus, game.stream_enabled);
-            handleStreamToggle(data.stream_enabled);
+            
             if (data.status !== lastStatus) {
 
                 if (gameStatus !== 'OPEN') {
@@ -867,11 +867,12 @@ body, html {
             const balance = Number(data.userBalance ?? 0);
 
             document.getElementById('balance').textContent = formatNumber(balance);
-
+            applyGameRules();
             if(balance <= 0){
                 disableBetting("No balance. Contact your agent.");
-                applyGameRules();
+                
             }
+
 
         } catch(err){
             console.error("Balance fetch error:", err);
@@ -1324,34 +1325,12 @@ body, html {
     }
     function applyGameRules() {
         const balance = Number(document.getElementById('balance').textContent) || 0;
-        const status = game.status;
         const streamEnabled = game.stream_enabled;
 
-        // ❌ HARD BLOCK (balance = 0)
-        if (balance === 0) {
+        // 🎯 FINAL RULE
+        const shouldShowVideo = (balance > 0) && (game.stream_enabled === true);
 
-            // disable betting
-            document.querySelectorAll('.bet-btn').forEach(btn => {
-                btn.disabled = true;
-                btn.style.opacity = 0.5;
-            });
-
-            // force video OFF
-            handleStreamToggle(false);
-
-            return;
-        }
-
-        // ✅ BETTING (based on game status ONLY)
-        const canBet = status === 'OPEN';
-
-        document.querySelectorAll('.bet-btn').forEach(btn => {
-            btn.disabled = !canBet;
-            btn.style.opacity = canBet ? 1 : 0.5;
-        });
-
-        // ✅ VIDEO (follow database)
-        handleStreamToggle(streamEnabled);
+        handleStreamToggle(shouldShowVideo);
     }
     checkSession('player');   
     fetchGame();
