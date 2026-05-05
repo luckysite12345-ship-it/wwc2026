@@ -186,7 +186,19 @@ body, html {
                             allowfullscreen
                             style="display:block;">
                         </iframe>
-
+                        <div id="videoPlaceholder" style="
+                            display:none;
+                            position:absolute;
+                            inset:0;
+                            background:#000;
+                            color:#fff;
+                            justify-content:center;
+                            align-items:center;
+                            text-align:center;
+                            font-size:14px;
+                        ">
+                            📡 Video is currently unavailable
+                        </div>
                         
 
                         <!-- SWITCH BUTTONS -->
@@ -560,7 +572,7 @@ body, html {
         game.status = gameStatus;
 
         updateControls(gameStatus, data.stream_enabled);
-
+        handleStreamToggle(data.stream_enabled);
         // =========================
         // 🔥 STATUS CHANGE DETECTION
         // =========================
@@ -996,20 +1008,26 @@ body, html {
     }
     function handleStreamToggle(enabled) {
         const iframe = document.getElementById("videoFrame");
+        const placeholder = document.getElementById("videoPlaceholder");
 
-        if (!iframe) return;
+        if (!iframe || !placeholder) return;
 
         if (enabled) {
+            // ✅ SHOW VIDEO
             iframe.style.display = "block";
+            placeholder.style.display = "none";
 
-            // ✅ ALWAYS restore
             if (currentVideo) {
                 iframe.src = currentVideo;
             }
 
         } else {
+            // ❌ HIDE VIDEO
             iframe.src = ""; // stop video
             iframe.style.display = "none";
+
+            // ✅ SHOW PLACEHOLDER
+            placeholder.style.display = "flex";
         }
     }
     function animateValue(id, start, end) {
