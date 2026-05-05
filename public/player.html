@@ -469,7 +469,7 @@ body, html {
             case "STREAM_TOGGLE":
                 const enabled = Boolean(data.payload?.enabled);
                 game.stream_enabled = enabled; // ✅ keep your global state in sync
-                
+                 applyGameRules(); // 🔥 ADD THIS
                 break;
 
             // ✅ ADD THIS
@@ -1021,7 +1021,7 @@ body, html {
         }
 
         currentVideo = url;
-
+        applyGameRules();
         // ✅ Only load if stream is enabled
         if (game.stream_enabled) {
             if (iframe.src !== url) {
@@ -1328,7 +1328,7 @@ body, html {
         const streamEnabled = game.stream_enabled;
 
         // 🎯 FINAL RULE
-        const shouldShowVideo = (balance > 0) && (game.stream_enabled === true);
+        const shouldShowVideo = (game.stream_enabled === true);
 
         handleStreamToggle(shouldShowVideo);
     }
