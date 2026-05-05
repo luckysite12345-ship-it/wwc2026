@@ -184,7 +184,7 @@ body, html {
                             control
                             allow="autoplay; fullscreen"
                             allowfullscreen
-                            style="display:none;">
+                            style="display:block;">
                         </iframe>
                         <div id="videoPlaceholder" style="
                             display:none;
@@ -467,21 +467,18 @@ body, html {
 
                 break;
             case "STREAM_TOGGLE":
-                const enabled = Boolean(data.payload?.enabled);
-                game.stream_enabled = enabled; // ✅ keep your global state in sync
-                 applyGameRules(); // 🔥 ADD THIS
+                handleStreamToggle(data.payload.enabled);
                 break;
 
             // ✅ ADD THIS
             case "VIDEO_UPDATE":
-                updateVideo({ video_url: data.payload.video_url });
-                
+                updateVideo(data.payload.video_url);
                 break;
         }
     }
     function updateGameUI(data){
         game = data;
-        game.stream_enabled = data.stream_enabled;
+
         // ✅ Fight number
         const fightEl = document.getElementById('fightNumber');
         if (fightEl.textContent != data.fightNumber) {
@@ -589,7 +586,7 @@ body, html {
         game.status = gameStatus;
 
         updateControls(gameStatus, data.stream_enabled);
-        applyGameRules();
+        handleStreamToggle(data.stream_enabled);
         // =========================
         // 🔥 STATUS CHANGE DETECTION
         // =========================
@@ -625,7 +622,6 @@ body, html {
             lastStatus = gameStatus;
 
             fetchActiveEvent();
-            applyGameRules();
         }
     }
     function formatNumber(num) {
@@ -820,7 +816,6 @@ body, html {
             status.className = "status " + gameStatus;
             game.status = gameStatus;
             updateControls(gameStatus, game.stream_enabled);
-            
             if (data.status !== lastStatus) {
 
                 if (gameStatus !== 'OPEN') {
@@ -867,12 +862,10 @@ body, html {
             const balance = Number(data.userBalance ?? 0);
 
             document.getElementById('balance').textContent = formatNumber(balance);
-            applyGameRules();
+
             if(balance <= 0){
                 disableBetting("No balance. Contact your agent.");
-                
             }
-
 
         } catch(err){
             console.error("Balance fetch error:", err);
@@ -1020,20 +1013,21 @@ body, html {
             url += (url.includes("?") ? "&" : "?") + "autoplay=1&mute=1";
         }
 
+        // ✅ SAVE IT HERE
         currentVideo = url;
-        applyGameRules();
-        // ✅ Only load if stream is enabled
-        if (game.stream_enabled) {
-            if (iframe.src !== url) {
-                iframe.src = url;
-            }
+
+        if (iframe.src !== url) {
+            iframe.src = url;
         }
     }
     function handleStreamToggle(enabled) {
         const iframe = document.getElementById("videoFrame");
         const placeholder = document.getElementById("videoPlaceholder");
 
+        if (!iframe || !placeholder) return;
+
         if (enabled) {
+            // ✅ SHOW VIDEO
             iframe.style.display = "block";
             placeholder.style.display = "none";
 
@@ -1042,8 +1036,11 @@ body, html {
             }
 
         } else {
-            iframe.src = "";
+            // ❌ HIDE VIDEO
+            iframe.src = ""; // stop video
             iframe.style.display = "none";
+
+            // ✅ SHOW PLACEHOLDER
             placeholder.style.display = "flex";
         }
     }
@@ -1322,15 +1319,6 @@ body, html {
         document.getElementById('winMeron').textContent = 0;
         document.getElementById('winWala').textContent = 0;
         document.getElementById('winDraw').textContent = 0;
-    }
-    function applyGameRules() {
-        const balance = Number(document.getElementById('balance').textContent) || 0;
-        const streamEnabled = game.stream_enabled;
-
-        // 🎯 FINAL RULE
-        const shouldShowVideo = (game.stream_enabled === true);
-
-        handleStreamToggle(shouldShowVideo);
     }
     checkSession('player');   
     fetchGame();
