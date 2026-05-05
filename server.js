@@ -1400,7 +1400,20 @@ app.post('/api/start-game', isAuthenticated, async (req, res) => {
       UPDATE games SET status='CLOSED'
       WHERE status='OPEN'
     `);
-      
+    // ✅ ADD THIS BLOCK HERE
+    const existing = await pool.query(`
+      SELECT id FROM games
+      WHERE fight_number = $1
+      AND event_name = $2
+      AND status != 'RESOLVED'
+      LIMIT 1
+    `, [fightNumber, event_name]);
+    
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: "Game already exists" });
+    }
+    
+    // ✅ INSERT NEW GAME
     const result = await pool.query(`
       INSERT INTO games (fight_number, status, event_name)
       VALUES ($1, 'OPEN', $2)
