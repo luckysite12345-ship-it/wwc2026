@@ -865,6 +865,8 @@ body, html {
 
             if(balance <= 0){
                 disableBetting("No balance. Contact your agent.");
+                // ❌ FORCE VIDEO OFF
+                handleStreamToggle(false);
             }
 
         } catch(err){
@@ -997,7 +999,8 @@ body, html {
                 data.announcement || "Welcome Players";
 
             updateVideo(data); // ✅ ONLY THIS
-
+            // ✅ APPLY STREAM STATE FROM DB
+            handleStreamToggle(data.stream_enabled);
         }catch(e){
             console.error(e);
         }
@@ -1026,7 +1029,9 @@ body, html {
 
         if (!iframe || !placeholder) return;
 
-        if (enabled) {
+        const balance = Number(document.getElementById('balance').textContent.replace(/,/g, ''));
+
+        if (enabled && balance > 0) {
             // ✅ SHOW VIDEO
             iframe.style.display = "block";
             placeholder.style.display = "none";
