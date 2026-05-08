@@ -2259,11 +2259,47 @@ app.get('/api/my-result', isAuthenticated, async (req, res) => {
         // ==========================
         // PLAYER WON
         // ==========================
-        let payout = bet.amount;
 
-        // DRAW = 8x
+        let payout = 0;
+
+        // 🎯 DRAW
         if (winner === 'DRAW') {
+
             payout = Number((bet.amount * 8).toFixed(2));
+
+        } else {
+
+            // 🔥 Calculate live odds
+            const totalsRes = await client.query(`
+                SELECT
+                    COALESCE(SUM(CASE WHEN side='MERON' THEN amount END),0) AS meron,
+                    COALESCE(SUM(CASE WHEN side='WALA' THEN amount END),0) AS wala
+                FROM bets
+                WHERE game_id = $1
+            `, [gameId]);
+
+            const meron = Number(totalsRes.rows[0].meron);
+            const wala = Number(totalsRes.rows[0].wala);
+
+            const totalPool = meron + wala;
+
+            const TARGET_AVG = 1.83;
+
+            let CUT = 0;
+
+            if (meron > 0 && wala > 0) {
+                CUT = (2 * TARGET_AVG * meron * wala) / ((meron + wala) ** 2);
+            }
+
+            const MIN_CUT = 0.70;
+            CUT = Math.max(MIN_CUT, CUT);
+
+            const payouts = {
+                MERON: meron > 0 ? (totalPool / meron) * CUT : 0,
+                WALA: wala > 0 ? (totalPool / wala) * CUT : 0
+            };
+
+            payout = Number((bet.amount * payouts[winner]).toFixed(2));
         }
 
         // already paid
