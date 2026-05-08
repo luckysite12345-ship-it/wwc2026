@@ -2149,14 +2149,17 @@ app.post('/api/withdraw-points-player', isAuthenticated, async (req, res) => {
   }
 });
 // ==========================
-// MY RESULT API (TO SHOW WIN/LOSE STATUS AND WIN AMOUNT AFTER GAME IS RESOLVED)
+// MY RESULT API
 // ==========================
 app.get('/api/my-result', isAuthenticated, async (req, res) => {
+    const client = await pool.connect();
+
     try {
         const userId = req.session.user.id;
 
-        const gameRes = await pool.query(`
-            SELECT id FROM games
+        const gameRes = await client.query(`
+            SELECT id, winner
+            FROM games
             ORDER BY created_at DESC
             LIMIT 1
         `);
@@ -2165,12 +2168,22 @@ app.get('/api/my-result', isAuthenticated, async (req, res) => {
             return res.json({ result: "NO_GAME" });
         }
 
-        const gameId = gameRes.rows[0].id;
+        const game = gameRes.rows[0];
 
-        const betRes = await pool.query(`
-            SELECT side, amount
+        const gameId = game.id;
+        const winner = game.winner;
+
+        if (!winner) {
+            return res.json({ result: "PENDING" });
+        }
+
+        // 🔒 Lock player's bet row
+        const betRes = await client.query(`
+            SELECT id, side, amount, is_resolved
             FROM bets
-            WHERE user_id = $1 AND game_id = $2
+            WHERE user_id = $1
+              AND game_id = $2
+            FOR UPDATE
         `, [userId, gameId]);
 
         if (!betRes.rows.length) {
@@ -2179,30 +2192,140 @@ app.get('/api/my-result', isAuthenticated, async (req, res) => {
 
         const bet = betRes.rows[0];
 
-        const gameResultRes = await pool.query(`
-            SELECT winner FROM games WHERE id = $1
-        `, [gameId]);
+        // ==========================
+        // CANCELLED
+        // ==========================
+        if (winner === 'CANCELLED') {
 
-        const winner = gameResultRes.rows[0].winner;
+            if (!bet.is_resolved) {
 
-        if (!winner) {
-            return res.json({ result: "PENDING" });
-        }
+                await client.query('BEGIN');
 
-        if (winner === "CANCELLED") {
-            return res.json({ result: "CANCELLED" });
+                // refund
+                await client.query(`
+                    UPDATE users
+                    SET points = points + $1
+                    WHERE id = $2
+                `, [bet.amount, userId]);
+
+                await client.query(`
+                    UPDATE bets
+                    SET is_resolved = true
+                    WHERE id = $1
+                `, [bet.id]);
+
+                await client.query(`
+                    INSERT INTO wallet_transactions
+                    (user_id, type, amount, balance_after, description)
+                    VALUES (
+                        $1,
+                        'credit',
+                        $2,
+                        (SELECT points FROM users WHERE id=$1),
+                        'Refund - Cancelled Game'
+                    )
+                `, [userId, bet.amount]);
+
+                await client.query('COMMIT');
+            }
+
+            return res.json({
+                result: "CANCELLED",
+                refunded: true
+            });
         }
 
         const isWin = bet.side === winner;
 
+        // ==========================
+        // PLAYER LOST
+        // ==========================
+        if (!isWin) {
+
+            if (!bet.is_resolved) {
+                await client.query(`
+                    UPDATE bets
+                    SET is_resolved = true
+                    WHERE id = $1
+                `, [bet.id]);
+            }
+
+            return res.json({
+                result: "LOSE",
+                winAmount: 0
+            });
+        }
+
+        // ==========================
+        // PLAYER WON
+        // ==========================
+        let payout = bet.amount;
+
+        // DRAW = 8x
+        if (winner === 'DRAW') {
+            payout = Number((bet.amount * 8).toFixed(2));
+        }
+
+        // already paid
+        if (bet.is_resolved) {
+            return res.json({
+                result: "WIN",
+                winAmount: payout,
+                alreadyPaid: true
+            });
+        }
+
+        // ==========================
+        // PAY WINNER
+        // ==========================
+        await client.query('BEGIN');
+
+        await client.query(`
+            UPDATE users
+            SET points = points + $1
+            WHERE id = $2
+        `, [payout, userId]);
+
+        await client.query(`
+            UPDATE bets
+            SET is_resolved = true
+            WHERE id = $1
+        `, [bet.id]);
+
+        await client.query(`
+            INSERT INTO wallet_transactions
+            (user_id, type, amount, balance_after, description)
+            VALUES (
+                $1,
+                'credit',
+                $2,
+                (SELECT points FROM users WHERE id=$1),
+                $3
+            )
+        `, [
+            userId,
+            payout,
+            `Win - ${winner}`
+        ]);
+
+        await client.query('COMMIT');
+
         res.json({
-            result: isWin ? "WIN" : "LOSE",
-            winAmount: isWin ? bet.amount : 0 // optional calc
+            result: "WIN",
+            winAmount: payout
         });
 
     } catch (err) {
+
+        try {
+            await client.query('ROLLBACK');
+        } catch {}
+
         console.error(err);
         res.status(500).json({ error: "Server error" });
+
+    } finally {
+        client.release();
     }
 });
 // ==========================
