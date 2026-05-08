@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Account Management - SWC423</title>
+    <title>Account Management</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -48,12 +48,47 @@
         </div>
 
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name"></span>. All rights reserved.
         </footer>
 
     </div>
 
     <script>
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Account Management - ${data.websiteName}`;
+
+                // Update website names
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
+
+        // =========================
+        // Session Check
+        // =========================
         async function checkSession() {
             try {
                 const res = await fetch('/api/dashboard', {
@@ -76,11 +111,40 @@
             }
         }
 
+        // =========================
+        // Sidebar Toggle
+        // =========================
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             sidebar.classList.toggle('collapsed');
         }
-        //Code for logout
+
+        // =========================
+        // Snackbar
+        // =========================
+        function showSnackbar(message, type = "success") {
+            let snackbar = document.getElementById("snackbar");
+
+            // Create snackbar dynamically if missing
+            if (!snackbar) {
+                snackbar = document.createElement("div");
+                snackbar.id = "snackbar";
+                document.body.appendChild(snackbar);
+            }
+
+            snackbar.textContent = message;
+            snackbar.className = "";
+            snackbar.classList.add(type);
+            snackbar.classList.add("show");
+
+            setTimeout(() => {
+                snackbar.classList.remove("show");
+            }, 3000);
+        }
+
+        // =========================
+        // Logout
+        // =========================
         async function logout() {
             try {
                 const res = await fetch('/api/logout', {
@@ -91,7 +155,6 @@
                 const data = await res.json();
                 console.log(data);
 
-                // ✅ Redirect after logout
                 showSnackbar("Logged out successfully");
 
                 setTimeout(() => {
@@ -103,7 +166,16 @@
                 showSnackbar("Logout failed", "error");
             }
         }
-        checkSession();
+
+        // =========================
+        // Init
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+        }
+
+        init();
     </script>
 
 </body>

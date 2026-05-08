@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Players Management - SWC423</title>
+    <title>Players Management</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -49,6 +49,13 @@
 
                 <!-- FILTER -->
                 <div class="filter-bar">
+                    <input
+                        type="text"
+                        id="searchUsername"
+                        class="membership-link"
+                        placeholder="🔍 Search username..."
+                        oninput="loadPlayers()"
+                    />
                     <!--<select id="statusFilter" class="styled-select" onchange="loadPlayers()">-->
                     <select id="statusFilter" class="membership-link" onchange="loadPlayers()">
                         <option value="">All Status</option>
@@ -102,13 +109,43 @@
             </div>
         </div>
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name"></span>. All rights reserved.
         </footer>
 
     </div>
 
     <script>
-        
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Players Management - ${data.websiteName}`;
+
+                // Update website placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         function formatNumber(amount) {
             return new Intl.NumberFormat('en-PH', {
                 minimumFractionDigits: 2,
@@ -231,7 +268,13 @@
                 if (filter) {
                     players = players.filter(p => p.status === filter);
                 }
+                const search = document.getElementById('searchUsername')?.value.toLowerCase() || '';
 
+                if (search) {
+                    players = players.filter(p =>
+                        p.username.toLowerCase().includes(search)
+                    );
+                }
                 const table = document.getElementById('playersTable');
                 table.innerHTML = '';
 
@@ -296,15 +339,27 @@
         // =========================
         async function resetPassword(userId) {
             openConfirmModal("Reset password to 123456?", async () => {
-                const res = await fetch('/api/reset-password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ userId })
-                });
+                try {
+                    const res = await fetch('/api/reset-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ userId })
+                    });
 
-                const data = await res.json();
-                showSnackbar(data.message);
+                    const data = await res.json().catch(() => null);
+
+                    if (!res.ok) {
+                        showSnackbar(data?.error || "Reset failed");
+                        return;
+                    }
+
+                    showSnackbar(data?.message || "Password reset successful", true);
+
+                } catch (err) {
+                    console.error(err);
+                    showSnackbar("Server error");
+                }
             });
         }
         // =========================
@@ -516,8 +571,17 @@
                 showSnackbar("Logout failed", "error");
             }
         }
-        // Call after session check
-        checkSession();
+        // =========================
+        // Init
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+        }
+
+        init();
+
+        // background refresh tasks
         setInterval(loadWithdrawCount, 10000);
         setInterval(loadPendingCount, 10000);
     </script>

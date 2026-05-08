@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Commission Logs - SWC423</title>
+    <title>Commission Logs</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -46,9 +46,9 @@
         <div class="content">
             <h2>Commission Logs</h2>
             <div class="filters">
-                <input type="text" id="search" placeholder="Search username / fight #">
-                <input type="date" id="from">
-                <input type="date" id="to">
+                <input type="text" id="search" placeholder="Search username / fight #" oninput="debouncedLoad()">
+                <input type="date" id="from" onchange="loadCommissionLogs()">
+                <input type="date" id="to" onchange="loadCommissionLogs()">
                 <button onclick="loadCommissionLogs()">Search</button>
             </div>
             <div class="table-wrapper">
@@ -70,12 +70,43 @@
         </div>
 
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name"></span>. All rights reserved.
         </footer>
 
     </div>
 
     <script>
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Commission Logs - ${data.websiteName}`;
+
+                // Update website placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         async function checkSession() {
             try {
                 const res = await fetch('/api/dashboard', {
@@ -186,9 +217,18 @@
                 console.error(err);
             }
         }
+        let searchTimeout = null;
+
+        function debouncedLoad() {
+            clearTimeout(searchTimeout);
+
+            searchTimeout = setTimeout(() => {
+                loadCommissionLogs();
+            }, 400);
+        }
         async function loadCommissionLogs() {
             try {
-                const search = document.getElementById('search')?.value || '';
+                const search = (document.getElementById('search')?.value || '').trim();
                 const from = document.getElementById('from')?.value || '';
                 const to = document.getElementById('to')?.value || '';
 
@@ -255,10 +295,19 @@
                 showSnackbar("Logout failed", "error");
             }
         }
-        checkSession();
-        loadCommissionLogs();
-        setInterval(loadWithdrawCount, 10000);
-        setInterval(loadPendingCount, 10000);
+        // =========================
+        // Init
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+            loadCommissionLogs();
+
+            setInterval(loadWithdrawCount, 10000);
+            setInterval(loadPendingCount, 10000);
+        }
+
+        init();
     </script>
 
 </body>

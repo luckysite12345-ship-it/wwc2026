@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Sign Up - SWC423</title>
+<title>Sign Up</title>
 <link rel="stylesheet" href="style.css">
 </head>
 
@@ -16,7 +16,7 @@
     <!-- LOGO -->
     <img src="logo.png" class="logo" alt="Logo">
 
-    <h1>SWC423</h1>
+    <h1 class="website-name">Website</h1><h1>SWC888</h1>
     <p class="subtitle">Create your account</p>
 
     <!-- USERNAME -->
@@ -58,88 +58,131 @@
 </div>
 
 <script>
+    // =========================
+    // Global App Config
+    // =========================
+    let APP_CONFIG = {
+        websiteName: "Website",
+        websiteUrl: window.location.origin
+    };
 
-// =========================
-// SNACKBAR
-// =========================
-function showSnackbar(message, type = "success") {
-    const bar = document.getElementById("snackbar");
-    bar.textContent = message;
-    bar.className = "show " + type;
+    // =========================
+    // Load Config
+    // =========================
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
 
-    setTimeout(() => {
-        bar.className = bar.className.replace("show", "").trim();
-    }, 3000);
-}
+            APP_CONFIG = data;
 
-// =========================
-// TOGGLE PASSWORD
-// =========================
-function togglePassword(id, el) {
-    const input = document.getElementById(id);
+            // Update page title
+            document.title = `Sign Up - ${data.websiteName}`;
 
-    if (input.type === "password") {
-        input.type = "text";
-        el.textContent = "🙈";
-    } else {
-        input.type = "password";
-        el.textContent = "👁";
+            // Update website name placeholders
+            document.querySelectorAll('.website-name')
+                .forEach(el => {
+                    el.textContent = data.websiteName;
+                });
+
+        } catch (err) {
+            console.error('Failed to load config:', err);
+        }
     }
-}
+    // =========================
+    // SNACKBAR
+    // =========================
+    function showSnackbar(message, type = "success") {
+        const bar = document.getElementById("snackbar");
+        bar.textContent = message;
+        bar.className = "show " + type;
 
-// =========================
-// GET REF ID
-// =========================
-function getRef() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("ref");
-}
-
-// =========================
-// SIGNUP
-// =========================
-async function signup() {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
-    const confirmPassword = document.getElementById("confirmPassword").value.trim();
-    const parent_id = getRef();
-
-    if (!username || !password || !confirmPassword) {
-        showSnackbar("Fill all fields", "warning");
-        return;
+        setTimeout(() => {
+            bar.className = bar.className.replace("show", "").trim();
+        }, 3000);
     }
 
-    if (password !== confirmPassword) {
-        showSnackbar("Passwords do not match", "error");
-        return;
+    // =========================
+    // TOGGLE PASSWORD
+    // =========================
+    function togglePassword(id, el) {
+        const input = document.getElementById(id);
+
+        if (input.type === "password") {
+            input.type = "text";
+            el.textContent = "🙈";
+        } else {
+            input.type = "password";
+            el.textContent = "👁";
+        }
     }
 
-    try {
-        const res = await fetch('/api/signup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, parent_id })
-        });
+    // =========================
+    // GET REF ID
+    // =========================
+    function getRef() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("ref");
+    }
 
-        const data = await res.json();
+    // =========================
+    // SIGNUP
+    // =========================
+    async function signup() {
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value.trim();
+        const confirmPassword = document.getElementById("confirmPassword").value.trim();
+        const parent_id = getRef();
 
-        if (data.error) {
-            showSnackbar(data.error, "error");
+        if (!username || !password || !confirmPassword) {
+            showSnackbar("Fill all fields", "warning");
             return;
         }
 
-        showSnackbar("Account created! Waiting for approval", "success");
+        if (password !== confirmPassword) {
+            showSnackbar("Passwords do not match", "error");
+            return;
+        }
 
-        // optional: clear fields
-        document.getElementById("username").value = "";
-        document.getElementById("password").value = "";
-        document.getElementById("confirmPassword").value = "";
+        try {
+            const res = await fetch('/api/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, parent_id })
+            });
 
-    } catch (err) {
-        console.error(err);
-        showSnackbar("Server error", "error");
+            const data = await res.json();
+
+            if (data.error) {
+                showSnackbar(data.error, "error");
+                return;
+            }
+
+            showSnackbar("Account created! Waiting for approval", "success");
+
+            // optional: clear fields
+            document.getElementById("username").value = "";
+            document.getElementById("password").value = "";
+            document.getElementById("confirmPassword").value = "";
+
+        } catch (err) {
+            console.error(err);
+            showSnackbar("Server error", "error");
+        }
     }
-}
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+            signup();
+        }
+    });
+    // =========================
+    // INIT
+    // =========================
+    async function init() {
+        await loadConfig();
+    }
+
+    init();
 
 </script>
 

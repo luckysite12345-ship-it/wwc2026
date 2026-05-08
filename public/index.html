@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sign In - SWC423</title>
+    <title>Sign In</title>
     <link rel="stylesheet" href="style.css">
     
 </head>
@@ -11,10 +11,10 @@
     <div id="snackbar"></div>
     <div class="login-container">
         <!-- Logo -->
-        <img src="logo.png" alt="SWC423 Logo" class="logo">
+        <img src="logo.png" alt="SWC888 Logo" class="logo">
 
         <!-- Site Title -->
-        <h1>SWC423</h1>
+        <h1 class="website-name"></h1>
 
         <!-- Username Field -->
         <div class="input-group">
@@ -39,6 +39,37 @@
     </div>
 
     <script>
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Sign In - ${data.websiteName}`;
+
+                // Update visible branding (logo text fallback)
+                const titleEl = document.querySelector("h1");
+                if (titleEl) {
+                    titleEl.textContent = data.websiteName;
+                }
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         function showSnackbar(message, type = "success") {
             const bar = document.getElementById("snackbar");
 
@@ -113,6 +144,22 @@
                 console.error(err);
             }
         }
+        // =========================
+        // Enter Key Login UX
+        // =========================
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                login();
+            }
+        });
+        // =========================
+        // Init
+        // =========================
+        async function init() {
+            await loadConfig();
+        }
+
+        init();
     </script>
 </body>
 </html>

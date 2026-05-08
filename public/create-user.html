@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Create User - SWC423</title>
+    <title id="pageTitle">Create User</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -14,7 +14,7 @@
     <!-- LOGO + TITLE -->
     <div class="brand">
         <img src="logo.png" alt="Logo" class="logo">
-        <h1>SWC423</h1>
+        <h1>SWC888</h1>
     </div>
 
     <h2>Create Account</h2>
@@ -45,91 +45,132 @@
 <div id="snackbar"></div>
 
 <script>
-// =========================
-// Toggle Password Visibility
-// =========================
-function togglePassword(id, el) {
-    const input = document.getElementById(id);
-    if (input.type === "password") {
-        input.type = "text";
-        el.textContent = "🙈";
-    } else {
-        input.type = "password";
-        el.textContent = "👁️";
+    // =========================
+    // Global App Config
+    // =========================
+    let APP_CONFIG = {
+        websiteName: "Website",
+        websiteUrl: window.location.origin
+    };
+
+    // =========================
+    // Load Config
+    // =========================
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+
+            APP_CONFIG = data;
+
+            // Update page title
+            document.title = `Create User - ${data.websiteName}`;
+
+            // Update website name placeholders
+            document.querySelectorAll('.website-name')
+                .forEach(el => {
+                    el.textContent = data.websiteName;
+                });
+
+        } catch (err) {
+            console.error('Failed to load config:', err);
+        }
     }
-}
-
-// =========================
-// Snackbar
-// =========================
-function showSnackbar(message, type = "success") {
-    const snackbar = document.getElementById("snackbar");
-
-    snackbar.textContent = message;
-    snackbar.className = "";
-    snackbar.classList.add(type);
-    snackbar.classList.add("show");
-
-    setTimeout(() => {
-        snackbar.classList.remove("show");
-    }, 3000);
-}
-
-// =========================
-// Create User
-// =========================
-async function createUser() {
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
-    const confirmPassword = document.getElementById('confirmPassword').value;
-    const role = document.getElementById('role').value.trim();
-    const parent_id = document.getElementById('parent_id').value;
-
-    // VALIDATION
-    if (!username || !password || !role) {
-        showSnackbar("Please fill all required fields", "error");
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        showSnackbar("Passwords do not match", "error");
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/create-user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-                username,
-                password,
-                role,
-                parent_id: parent_id || null
-            })
-        });
-
-        const data = await res.json();
-
-        if (data.error) {
-            showSnackbar(data.error, "error");
+    // =========================
+    // Toggle Password Visibility
+    // =========================
+    function togglePassword(id, el) {
+        const input = document.getElementById(id);
+        if (input.type === "password") {
+            input.type = "text";
+            el.textContent = "🙈";
         } else {
-            showSnackbar("User created successfully!", "success");
+            input.type = "password";
+            el.textContent = "👁️";
+        }
+    }
 
-            // Clear fields
-            document.getElementById('username').value = "";
-            document.getElementById('password').value = "";
-            document.getElementById('confirmPassword').value = "";
-            document.getElementById('role').value = "";
-            document.getElementById('parent_id').value = "";
+    // =========================
+    // Snackbar
+    // =========================
+    function showSnackbar(message, type = "success") {
+        const snackbar = document.getElementById("snackbar");
+
+        snackbar.textContent = message;
+        snackbar.className = "";
+        snackbar.classList.add(type);
+        snackbar.classList.add("show");
+
+        setTimeout(() => {
+            snackbar.classList.remove("show");
+        }, 3000);
+    }
+
+    // =========================
+    // Create User
+    // =========================
+    async function createUser() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        const role = document.getElementById('role').value.trim();
+        const parent_id = document.getElementById('parent_id').value;
+
+        // VALIDATION
+        if (!username || !password || !role) {
+            showSnackbar("Please fill all required fields", "error");
+            return;
         }
 
-    } catch (err) {
-        console.error(err);
-        showSnackbar("Server error", "error");
-    }
-}
-</script>
+        if (password !== confirmPassword) {
+            showSnackbar("Passwords do not match", "error");
+            return;
+        }
 
+        try {
+            const res = await fetch('/api/create-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    username,
+                    password,
+                    role,
+                    parent_id: parent_id || null
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                showSnackbar(data.error, "error");
+            } else {
+                showSnackbar("User created successfully!", "success");
+
+                // Clear fields
+                document.getElementById('username').value = "";
+                document.getElementById('password').value = "";
+                document.getElementById('confirmPassword').value = "";
+                document.getElementById('role').value = "";
+                document.getElementById('parent_id').value = "";
+            }
+
+        } catch (err) {
+            console.error(err);
+            showSnackbar("Server error", "error");
+        }
+    }
+    // =========================
+    // Init
+    // =========================
+    async function init() {
+        await loadConfig();
+    }
+
+    init();
+</script>
+<footer>
+    © 2024 <span class="website-name"></span>. All rights reserved.
+</footer>
 </body>
 </html>

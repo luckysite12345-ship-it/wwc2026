@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Players Management - SWC423</title>
+    <title>Players Management</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -98,12 +98,43 @@
         </div>
         <div id="snackbar"></div>
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name"></span>. All rights reserved.
         </footer>
 
     </div>
 
     <script>
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update title
+                document.title = `Players Management - ${data.websiteName}`;
+
+                // Update all website placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         async function checkSession() {
             try {
                 const res = await fetch('/api/dashboard', {
@@ -703,10 +734,16 @@
                 showSnackbar("Logout failed", "error");
             }
         }
-        // Call after session check
-        checkSession().then(() => {
-            loadAgents();
-        });
+        // =========================
+        // Init
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+            await loadAgents();
+        }
+
+        init();
     </script>
 
 </body>

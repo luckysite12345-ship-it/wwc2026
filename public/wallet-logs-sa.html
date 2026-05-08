@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wallet Logs - SWC423</title>
+    <title>Wallet Logs</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -60,12 +60,43 @@
         </div>
 
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name">Website</span>. All rights reserved.
         </footer>
 
     </div>
 
     <script>
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Wallet Logs - ${data.websiteName}`;
+
+                // Update website name placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         async function checkSession() {
             try {
                 const res = await fetch('/api/dashboard', {
@@ -238,10 +269,17 @@
                 console.error(err);
             }
         }
-        checkSession().then(() => {
-            loadUsers();
-            loadWalletLogs();
-        });
+        // =========================
+        // INIT
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+            await loadUsers();
+            await loadWalletLogs();
+        }
+
+        init();
         
     </script>
 

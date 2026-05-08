@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Summary Report - SWC423</title>
+    <title>Summary Report</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -44,7 +44,7 @@
         </div>
 
         <div class="content">
-            <h2>Commission Summary</h2>
+            <h2 class="website-name">Website - Commission Summary</h2>
 
             <!-- FILTERS -->
             <div class="filters">
@@ -69,12 +69,43 @@
         </div>
 
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 SWC888. All rights reserved.
         </footer>
 
     </div>
 
     <script>
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Summary Report - ${data.websiteName}`;
+
+                // Update website name placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = `${data.websiteName} - Commission Summary`;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         async function checkSession() {
             try {
                 const res = await fetch('/api/dashboard', {
@@ -98,8 +129,8 @@
                 console.error(err);
                 window.location.href = '/';
             }
-            loadPendingCount();
-            loadWithdrawCount();
+            await loadPendingCount();
+            await loadWithdrawCount();
         }
 
         // =========================
@@ -247,8 +278,15 @@
                 showSnackbar("Logout failed", "error");
             }
         }
-        checkSession();
-        loadCommissionSummary();
+        // =========================
+        // INIT
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+        }
+
+        init();
         setInterval(loadWithdrawCount, 10000);
         setInterval(loadPendingCount, 10000);
     </script>

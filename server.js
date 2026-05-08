@@ -29,7 +29,12 @@ const http = require('http');
 const server = http.createServer(app);
 const superadminRoutes = require('./routes/superadmin');
 
-
+app.get('/api/config', (req, res) => {
+    res.json({
+        websiteName: process.env.WEBSITE_NAME,
+        websiteUrl: process.env.WEBSITE_URL
+    });
+});
 
 initWebSocket(server);
 const settleGame = async (gameId, winner) => {
@@ -227,6 +232,13 @@ const settleGame = async (gameId, winner) => {
       UPDATE bets
       SET is_resolved = true
       WHERE game_id = $1 AND is_resolved = false
+    `, [gameId]);
+    
+    // ✅ mark commissions as settled
+    await client.query(`
+      UPDATE commission_transactions
+      SET status = 0
+      WHERE game_id = $1
     `, [gameId]);
 
     await client.query('COMMIT');
@@ -793,9 +805,9 @@ app.post('/api/update-status', isAuthenticated, async (req, res) => {
 app.post('/api/reset-password', isAuthenticated, async (req, res) => {
   const { userId } = req.body;
 
-  if (req.session.user.role !== 'admin') {
+ /* if (req.session.user.role !== 'admin') {
     return res.status(403).json({ error: "Unauthorized" });
-  }
+  }*/
 
   try {
     const hashed = await bcrypt.hash('123456', 10);
@@ -1005,8 +1017,16 @@ app.post('/api/withdraw-points', isAuthenticated, async (req, res) => {
 
 app.get('/api/my-wallet-transactions', isAuthenticated, async (req, res) => {
   try {
+
     const userId = req.session.user.id;
     const userRole = req.session.user.role;
+
+    const {
+      search = '',
+      from,
+      to,
+      limit = 100
+    } = req.query;
 
     let query = `
       SELECT 
@@ -1023,14 +1043,63 @@ app.get('/api/my-wallet-transactions', isAuthenticated, async (req, res) => {
     `;
 
     const params = [];
+    let i = 1;
 
-    // ✅ Restrict only if NOT super admin
+    // ==========================
+    // BASE FILTER
+    // ==========================
     if (userRole !== '-1') {
-      query += ` WHERE wt.user_id = $1`;
+      query += ` WHERE wt.user_id = $${i}`;
       params.push(userId);
+      i++;
+    } else {
+      query += ` WHERE 1=1`;
     }
 
-    query += ` ORDER BY wt.created_at DESC`;
+    // ==========================
+    // SEARCH
+    // ==========================
+    if (search) {
+      query += `
+        AND (
+          u.username ILIKE $${i}
+          OR wt.description ILIKE $${i}
+          OR CAST(wt.amount AS TEXT) ILIKE $${i}
+          OR wt.type ILIKE $${i}
+        )
+      `;
+
+      params.push(`%${search}%`);
+      i++;
+    }
+
+    // ==========================
+    // FROM DATE
+    // ==========================
+    if (from) {
+      query += ` AND wt.created_at >= $${i}`;
+      params.push(from);
+      i++;
+    }
+
+    // ==========================
+    // TO DATE
+    // ==========================
+    if (to) {
+      query += ` AND wt.created_at <= $${i}`;
+      params.push(to);
+      i++;
+    }
+
+    // ==========================
+    // ORDER + LIMIT
+    // ==========================
+    query += `
+      ORDER BY wt.created_at DESC
+      LIMIT $${i}
+    `;
+
+    params.push(limit);
 
     const result = await pool.query(query, params);
 
@@ -1038,10 +1107,9 @@ app.get('/api/my-wallet-transactions', isAuthenticated, async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: 'Server error' });
   }
 });
-
 // ==========================
 // PLACE BET API
 // ==========================
@@ -1726,16 +1794,20 @@ app.post('/api/declarator/set-video', isAuthenticated, async (req, res) => {
 app.get('/api/game-history', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT g.winner
+            SELECT 
+                g.winner,
+                g.fight_number,
+                g.id,
+                g.event_name
             FROM games g
             JOIN active_event ae
                 ON g.event_name = ae.event_name
             WHERE g.winner IS NOT NULL
-            ORDER BY g.fight_number ASC
-            LIMIT 200
-        `);
+            ORDER BY g.id DESC
+            LIMIT 50`);
 
         res.json(result.rows);
+
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Failed to fetch history" });
@@ -1752,21 +1824,27 @@ app.get('/api/beads-history', async (req, res) => {
       JOIN active_event ae
         ON g.event_name = ae.event_name
       WHERE g.winner IS NOT NULL
-      ORDER BY g.id ASC
+      ORDER BY g.id DESC
       LIMIT 200
     `);
 
-    const history = result.rows.map(r => ({
+    // 🔥 Normalize order for frontend (oldest → newest)
+    const history = result.rows.reverse().map(r => ({
       winner: r.winner,
       fight_number: r.fight_number
     }));
 
-    const counts = {
-      MERON: history.filter(x => x === 'MERON').length,
-      WALA: history.filter(x => x === 'WALA').length,
-      DRAW: history.filter(x => x === 'DRAW').length,
-      CANCELLED: history.filter(x => x === 'CANCELLED').length
-    };
+    // ✅ Correct counting (fix object issue)
+    const counts = history.reduce((acc, cur) => {
+      const key = cur.winner;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {
+      MERON: 0,
+      WALA: 0,
+      DRAW: 0,
+      CANCELLED: 0
+    });
 
     res.json({
       history,
@@ -1774,7 +1852,7 @@ app.get('/api/beads-history', async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("Beads history error:", err);
     res.status(500).json({ error: "Failed to fetch beads history" });
   }
 });
@@ -1869,16 +1947,20 @@ app.get('/api/my-commission-transactions', isAuthenticated, async (req, res) => 
     const params = [];
     let i = 1;
 
-    // ✅ ONLY filter by user if NOT super admin
-    if (role !== -1) {
-      query += ` WHERE ct.user_id = $${i}`;
+    // ==========================
+    // 🔥 BASE FILTER (NOW INCLUDES STATUS)
+    // ==========================
+    if (role !== '-1') {
+      query += ` WHERE ct.user_id = $${i} AND ct.status = 0`;
       params.push(userId);
       i++;
     } else {
-      query += ` WHERE 1=1`; // dummy condition for easier appending
+      query += ` WHERE ct.status = 0`;
     }
 
+    // ==========================
     // 🔍 SEARCH
+    // ==========================
     if (search) {
       query += ` AND (
         u.username ILIKE $${i} 
@@ -1888,7 +1970,9 @@ app.get('/api/my-commission-transactions', isAuthenticated, async (req, res) => 
       i++;
     }
 
+    // ==========================
     // 📅 DATE FILTERS
+    // ==========================
     if (from) {
       query += ` AND ct.created_at >= $${i}`;
       params.push(from);

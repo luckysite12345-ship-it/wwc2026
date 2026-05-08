@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wallet Logs - SWC423</title>
+    <title>Wallet Logs</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -35,7 +35,21 @@
 
         <div class="content">
             <h2>Wallet Logs</h2>
+            <div class="filters">
 
+                <input type="text"
+                    id="search"
+                    placeholder="Search description or type">
+
+                <input type="date" id="from">
+
+                <input type="date" id="to">
+
+                <button onclick="loadWalletLogs()">
+                    Search
+                </button>
+
+            </div>
             <div class="table-wrapper">
                 <table class="styled-table" id="walletTable">
                     <thead>
@@ -59,18 +73,49 @@
                 <input type="number" id="withdrawAmount" placeholder="Enter points" />
 
                 <div style="margin-top:10px;">
-                    <button onclick="submitWithdraw()">Submit</button>
+                    <button id="withdrawBtn" onclick="submitWithdraw()">Submit</button>
                     <button onclick="closeWithdrawModal()">Cancel</button>
                 </div>
             </div>
         </div>
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name">Website</span>. All rights reserved.
         </footer>
 
     </div>
 
     <script>
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Wallet Logs - ${data.websiteName}`;
+
+                // Update website name placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         async function checkSession() {
             try {
                 const res = await fetch('/api/dashboard', {
@@ -86,7 +131,7 @@
 
                 document.querySelectorAll('.username')
                     .forEach(el => el.textContent = data.username);
-
+                window.playerBalance = Number(data.points || 0);
             } catch (err) {
                 console.error(err);
                 window.location.href = '/';
@@ -134,8 +179,29 @@
         });
 
         async function loadWalletLogs() {
+
             try {
-                const res = await fetch('/api/my-wallet-transactions', {
+
+                const search = (document.getElementById('search')?.value || '').trim();
+                const from = document.getElementById('from')?.value || '';
+                const to = document.getElementById('to')?.value || '';
+
+                const params = new URLSearchParams({
+                    search,
+                    from,
+                    to,
+                    limit: 100
+                });
+
+                const tbody = document.querySelector('#walletTable tbody');
+
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5">Loading...</td>
+                    </tr>
+                `;
+
+                const res = await fetch(`/api/my-wallet-transactions?${params}`, {
                     credentials: 'include'
                 });
 
@@ -145,24 +211,55 @@
                 }
 
                 const data = await res.json();
-                const tbody = document.querySelector('#walletTable tbody');
+
                 tbody.innerHTML = '';
 
+                if (!data.length) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="5">No wallet logs found</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
                 data.forEach(tx => {
+
                     const row = document.createElement('tr');
 
-                    const typeIcon = tx.type === 'credit' ? '↑' : '↓';
-                    const typeColor = tx.type === 'credit' ? 'red' : 'green';
+                    const isCredit = tx.type === 'credit';
+
+                    const typeIcon = isCredit ? '▲' : '▼';
+
+                    const typeColor = isCredit
+                        ? '#22c55e'
+                        : '#ef4444';
 
                     row.innerHTML = `
-                        <td>${new Date(tx.created_at).toLocaleString()}</td>
-                        <td style="color: ${typeColor}; font-weight: bold;">
+                        <td>
+                            ${new Date(tx.created_at).toLocaleString()}
+                        </td>
+
+                        <td style="
+                            color:${typeColor};
+                            font-weight:bold;
+                        ">
                             ${typeIcon} ${tx.type}
                         </td>
-                        <td>${formatMoney(tx.amount)}</td>
-                        <td>${formatMoney(tx.balance_after)}</td>
-                        <td>${formatDescription(tx.description)}</td>
+
+                        <td>
+                            ${formatMoney(tx.amount)}
+                        </td>
+
+                        <td>
+                            ${formatMoney(tx.balance_after)}
+                        </td>
+
+                        <td>
+                            ${formatDescription(tx.description)}
+                        </td>
                     `;
+
                     tbody.appendChild(row);
                 });
 
@@ -181,8 +278,8 @@
 
         async function submitWithdraw(){
             const amount = Number(document.getElementById('withdrawAmount').value);
-            const balance = Number(document.getElementById('balance').textContent);
-
+            const balance = Number(window.playerBalance || 0);
+            
             if (!amount || amount <= 0) {
                 return showSnackbar("Enter valid amount", "warning");
             }
@@ -204,7 +301,7 @@
                 if (!res.ok) {
                     throw new Error(data.error || "Request failed");
                 }
-
+                window.playerBalance -= amount;
                 showSnackbar("Withdrawal request submitted!");
                 closeWithdrawModal();
 
@@ -256,8 +353,24 @@
 
             return desc; // fallback
         }
-        checkSession();
-        loadWalletLogs();
+        document.getElementById('search')
+            ?.addEventListener('input', loadWalletLogs);
+
+        document.getElementById('from')
+            ?.addEventListener('change', loadWalletLogs);
+
+        document.getElementById('to')
+            ?.addEventListener('change', loadWalletLogs);
+        // =========================
+        // INIT
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+            await loadWalletLogs();
+        }
+
+        init();
     </script>
 
 </body>

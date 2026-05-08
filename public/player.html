@@ -4,14 +4,14 @@
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Player - SWC423</title>
+<title>Player</title>
 <link rel="stylesheet" href="style.css">
 
 <style>
 .video-container { width:100%; aspect-ratio:16/9; margin-bottom:15px; }
 .video-container iframe { width:100%; height:100%; border:none; }
 
-.betting-card { background:#1e293b; border-radius:12px; padding:15px; overflow: visible; }
+.betting-card { background:#1e293b; border-radius:12px; padding:15px; overflow: visible; max-height: 85vh; overflow-y: auto;}
 
 .row { display:flex; justify-content:space-between; margin-bottom:8px; }
 .header-row { font-weight:bold; color:#14b8a6; }
@@ -47,7 +47,7 @@
   grid-template-columns: repeat(auto-fill, 30px);
   gap: 5px;
   margin-top: 10px;
-  max-height: 250px;
+  max-height: 200px;
   overflow-y: auto;   /* 🔥 change this */
   overflow-x: hidden; /* 🔥 prevent sideways mess */
 }
@@ -84,6 +84,17 @@
 .wala { background: blue; }
 .draw { background: green; }
 .cancelled { background: gray; }
+
+@keyframes blinkLatest {
+    0%   { transform: scale(1); opacity: 1; box-shadow: 0 0 0px transparent; }
+    50%  { transform: scale(1.3); opacity: 0.6; box-shadow: 0 0 8px rgba(255,255,255,0.8); }
+    100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0px transparent; }
+}
+
+.latest-bead {
+    animation: blinkLatest 0.8s infinite;
+    z-index: 2;
+}
 /* 🔥 GLOBAL FIX */
 body, html {
     margin: 0;
@@ -103,7 +114,8 @@ body, html {
 }
 
 .betting-section {
-    flex: 1;
+    max-height: 100vh;
+    overflow-y: auto;
 }
 
 /* 📱 MOBILE FIX */
@@ -344,8 +356,8 @@ body, html {
             </div>
         </div>
     </div> <!-- content -->
-    <footer>
-        © 2024 SWC423. All rights reserved.
+     <footer>
+        © 2024 <span class="website-name"></span>. All rights reserved.
     </footer>
 </div> <!-- main -->
 
@@ -414,6 +426,37 @@ body, html {
             ws.close();
         };
     }
+// =========================
+    // Global App Config
+    // =========================
+    let APP_CONFIG = {
+        websiteName: "Website",
+        websiteUrl: window.location.origin
+    };
+
+    // =========================
+    // Load Config
+    // =========================
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+
+            APP_CONFIG = data;
+
+            // Update page title
+            document.title = `Player - ${data.websiteName}`;
+
+            // Update website placeholders
+            document.querySelectorAll('.website-name')
+                .forEach(el => {
+                    el.textContent = data.websiteName;
+                });
+
+        } catch (err) {
+            console.error('Failed to load config:', err);
+        }
+    }
     let heartbeatInterval = null;
 
     function startHeartbeat(){
@@ -447,6 +490,7 @@ body, html {
                 if (data.payload?.game) {
                     updateGameUI(data.payload.game);
                     //alert(JSON.stringify(data.payload.game, null, 2));
+                    loadBeads();
                 }
                 break;
 
@@ -464,7 +508,7 @@ body, html {
 
                 // ✅ ADD THIS
                 fetchMyResult();
-
+                loadBeads(); // 🔥 ADD THIS
                 break;
             case "STREAM_TOGGLE":
                 handleStreamToggle(data.payload.enabled);
@@ -622,6 +666,9 @@ body, html {
             lastStatus = gameStatus;
 
             fetchActiveEvent();
+            if (data.status !== lastStatus) {
+                fetchHistory();
+            }
         }
     }
     function formatNumber(num) {
@@ -727,7 +774,7 @@ body, html {
 
             showSnackbar("Bet placed successfully!");
             
-            document.getElementById('betAmount').value = '';
+            //document.getElementById('betAmount').value = '';
             closeBetModal();
 
             // optional refresh
@@ -1000,7 +1047,7 @@ body, html {
 
             updateVideo(data); // ✅ ONLY THIS
             // ✅ APPLY STREAM STATE FROM DB
-            handleStreamToggle(data.stream_enabled);
+            //handleStreamToggle(data.stream_enabled);
         }catch(e){
             console.error(e);
         }
@@ -1012,15 +1059,21 @@ body, html {
 
         let url = data.video_url;
 
+        // autoplay params
         if (!url.includes("autoplay=1")) {
             url += (url.includes("?") ? "&" : "?") + "autoplay=1&mute=1";
         }
 
-        // ✅ SAVE IT HERE
-        currentVideo = url;
+        // normalize URLs
+        const currentSrc = decodeURIComponent(iframe.src || "");
+        const newSrc = decodeURIComponent(new URL(url, window.location.origin).href);
 
-        if (iframe.src !== url) {
-            iframe.src = url;
+        // save current video
+        currentVideo = newSrc;
+
+        // ✅ ONLY reload iframe if URL actually changed
+        if (currentSrc !== newSrc) {
+            iframe.src = newSrc;
         }
     }
     function handleStreamToggle(enabled) {
@@ -1058,97 +1111,12 @@ body, html {
             const data = await res.json();
 
             renderBeadPlate(data);
-        }catch(err){
+
+        } catch(err){
             console.error(err);
         }
     }
-    function renderBeadPlate(history){
-        const container = document.getElementById('beadPlate');
-        container.innerHTML = '';
-
-        const MAX_ROWS = 6;
-
-        let columns = [];
-        let currentCol = [];
-        let lastWinner = null;
-
-        history.forEach(game => {
-            const winner = game.winner;
-
-            // 🎯 Ignore DRAW & CANCELLED for column switching
-            const isNeutral = (winner === 'DRAW' || winner === 'CANCELLED');
-
-            // 👉 Only MERON/WALA affect column logic
-            if (!isNeutral) {
-                if (
-                    winner !== lastWinner ||
-                    currentCol.length >= MAX_ROWS
-                ){
-                    if(currentCol.length){
-                        columns.push(currentCol);
-                    }
-                    currentCol = [];
-                }
-
-                lastWinner = winner;
-            }
-
-            // 👉 Always push (so DRAW/CANCELLED still show)
-            currentCol.push(winner);
-        });
-
-        if(currentCol.length){
-            columns.push(currentCol);
-        }
-
-        // 🔥 RENDER GRID (column-based)
-        /*container.style.display = 'grid';
-        container.style.gridAutoFlow = 'column';
-        container.style.gridTemplateRows = `repeat(${MAX_ROWS}, 14px)`;
-        container.style.background = '#0f172a';
-        container.style.padding = '6px';
-        container.style.borderRadius = '6px';
-        container.style.gap = '4px';*/
-
-        columns.forEach(col => {
-            for(let i=0; i<MAX_ROWS; i++){
-                const dot = document.createElement('div');
-
-                const size = window.innerWidth <= 768 ? 10 : 12;
-                dot.style.width = size + 'px';
-                dot.style.height = size + 'px';
-                dot.style.borderRadius = '50%';
-                dot.style.border = '2px solid transparent';
-                dot.style.background = 'transparent';
-
-                const result = col[i];
-
-                if(!result){
-                    dot.style.visibility = 'hidden';
-                } else {
-                    switch(result){
-                        case 'MERON':
-                            dot.style.borderColor = 'red';
-                            break;
-                        case 'WALA':
-                            dot.style.borderColor = 'blue';
-                            break;
-                        case 'DRAW':
-                            dot.style.borderColor = 'green';
-                            break;
-                        case 'CANCELLED':
-                            dot.style.borderColor = 'gray';
-                            break;
-                    }
-                }
-
-                container.appendChild(dot);
-                
-            }
-            const plate = document.getElementById('beadPlate');
-                plate.scrollLeft = plate.scrollWidth;
-        });
-    }
+    
     async function loadBeads() {
         const res = await fetch('/api/beads-history');
         const data = await res.json();
@@ -1178,6 +1146,95 @@ body, html {
             bead.innerText = item.fight_number;
 
             container.appendChild(bead);
+        });
+    }
+    function renderBeadPlate(history){
+        const container = document.getElementById('beadPlate');
+        container.innerHTML = '';
+
+        const MAX_ROWS = 6;
+
+        // 🔥 ensure correct order even if backend changes
+        history.sort((a, b) => a.fight_number - b.fight_number);
+
+        let columns = [];
+        let currentCol = [];
+        let lastWinner = null;
+
+        history.forEach(game => {
+            const winner = game.winner;
+            const isNeutral = (winner === 'DRAW' || winner === 'CANCELLED');
+
+            if (!isNeutral) {
+                if (winner !== lastWinner || currentCol.length >= MAX_ROWS){
+                    if (currentCol.length){
+                        columns.push(currentCol);
+                    }
+                    currentCol = [];
+                }
+                lastWinner = winner;
+            }
+
+            currentCol.push({
+                winner,
+                fight_number: game.fight_number
+            });
+        });
+
+        if (currentCol.length){
+            columns.push(currentCol);
+        }
+
+        let latestBead = null;
+
+        columns.forEach(col => {
+            for (let i = 0; i < MAX_ROWS; i++){
+                const dot = document.createElement('div');
+
+                const size = window.innerWidth <= 768 ? 10 : 12;
+                dot.style.width = size + 'px';
+                dot.style.height = size + 'px';
+                dot.style.borderRadius = '50%';
+                dot.style.border = '2px solid transparent';
+                dot.style.background = 'transparent';
+
+                const result = col[i];
+
+                if (!result){
+                    dot.style.visibility = 'hidden';
+                } else {
+                    switch(result.winner){
+                        case 'MERON':
+                            dot.style.borderColor = 'red';
+                            break;
+                        case 'WALA':
+                            dot.style.borderColor = 'blue';
+                            break;
+                        case 'DRAW':
+                            dot.style.borderColor = 'green';
+                            break;
+                        case 'CANCELLED':
+                            dot.style.borderColor = 'gray';
+                            break;
+                    }
+
+                    // 🔥 track actual latest fight
+                    latestBead = dot;
+                }
+
+                container.appendChild(dot);
+            }
+        });
+
+        requestAnimationFrame(() => {
+            container.scrollLeft = container.scrollWidth;
+
+            document.querySelectorAll('.latest-bead')
+                .forEach(el => el.classList.remove('latest-bead'));
+
+            if (latestBead) {
+                latestBead.classList.add('latest-bead');
+            }
         });
     }
     function updateControls(gameStatus, streamEnabled){
@@ -1325,15 +1382,22 @@ body, html {
         document.getElementById('winWala').textContent = 0;
         document.getElementById('winDraw').textContent = 0;
     }
-    checkSession('player');   
-    fetchGame();
-    checkPlayerBalance(); // ✅ initial load
-    //setInterval(fetchActiveEvent, 3000);
-    fetchActiveEvent();
-    fetchHistory();
-    loadBeads();
-    initWebSocket();
-    // 🔥 KEEP CONNECTION ALIVE (PREVENT DISCONNECT)
+    // =========================
+    // Init
+    // =========================
+    async function init() {
+        await loadConfig();
+
+        checkSession('player');   
+        fetchGame();
+        checkPlayerBalance();
+        fetchActiveEvent();
+        fetchHistory();
+        loadBeads();
+        initWebSocket();
+    }
+
+    init();
    
 </script>
 </body>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <!--<meta name="viewport" content="width=device-width, initial-scale=1.0">-->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Declarator - SWC423</title>
+<title>Declarator</title>
 <link rel="stylesheet" href="style.css">
 
 <style>
@@ -128,7 +128,7 @@ button:disabled {
     color:#facc15;
     font-weight:bold;
 ">
-    Welcome to SWC423
+    Welcome to SWC888
 </marquee>
 </div>
 
@@ -227,7 +227,7 @@ button:disabled {
 </div>
 
 <footer>
-    © 2024 SWC423. All rights reserved.
+    © 2024 <span class="website-name"></span>. All rights reserved.
 </footer>
 
 </div>
@@ -271,7 +271,37 @@ button:disabled {
     };
     let ws = null;
     let userRole = "declarator"; // since this page is declarator
-    
+    // =========================
+    // Global App Config
+    // =========================
+    let APP_CONFIG = {
+        websiteName: "Website",
+        websiteUrl: window.location.origin
+    };
+
+    // =========================
+    // Load Config
+    // =========================
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+
+            APP_CONFIG = data;
+
+            // Update page title
+            document.title = `Declarator - ${data.websiteName}`;
+
+            // Update website placeholders
+            document.querySelectorAll('.website-name')
+                .forEach(el => {
+                    el.textContent = data.websiteName;
+                });
+
+        } catch (err) {
+            console.error('Failed to load config:', err);
+        }
+    }
     function formatNumber(num) {
         return Number(num || 0).toLocaleString(undefined, {
             minimumFractionDigits: 2,
@@ -698,13 +728,7 @@ button:disabled {
         // 📺 STREAM TOGGLE
         const streamContainer = document.getElementById('streamContainer');
         if (streamContainer) {
-            // ✅ Declarator ALWAYS sees video
-            if (userRole === 'declarator') {
-                streamContainer.style.display = 'block';
-            } else {
-                // 👇 Only players are affected
-                streamContainer.style.display = data.stream_enabled ? 'block' : 'none';
-            }
+            streamContainer.style.display = data.stream_enabled ? 'block' : 'none';
         }
 
         // 🎥 VIDEO
@@ -866,12 +890,16 @@ button:disabled {
         document.getElementById('betConfirmModal').style.display = 'none';
     }
         
-    checkSession('declarator');
+    // =========================
+    // Init
+    // =========================
+    async function init() {
+        await loadConfig();
+        await checkSession('declarator');
+    }
 
-    
+    init();
 
-    
-    
     //Code for logout
     async function logout() {
         try {

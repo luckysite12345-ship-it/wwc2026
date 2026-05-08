@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Players Management - SWC423</title>
+    <title>Players Management</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -46,6 +46,13 @@
             <div class="membership-card">
                 <!-- FILTER -->
                 <div class="filter-bar">
+                    <input
+                        type="text"
+                        id="searchUsername"
+                        placeholder="🔍 Search username..."
+                        class="membership-link"
+                        oninput="loadAgents()"
+                    />
                     <select id="roleFilter" onchange="loadAgents()" class="membership-link">
                         
                         <option value="">All Roles</option>
@@ -103,14 +110,66 @@
                 <button onclick="closeNetworkModal()">Close</button>
             </div>
         </div>
+        <div id="resetPasswordModal" class="modal">
+            <div class="modal-content">
+                <h3>🔑 Reset Password</h3>
+
+                <p>
+                    Are you sure you want to reset this user’s password to:
+                    <strong>123456</strong>?
+                </p>
+
+                <div style="margin-top:15px;">
+                    <button onclick="confirmResetPassword()" class="btn activate">
+                        Yes, Reset
+                    </button>
+
+                    <button onclick="closeResetPasswordModal()" class="btn suspend">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
         <div id="snackbar"></div>
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name"></span>. All rights reserved.
         </footer>
 
     </div>
 
     <script>
+        let resetUserId = null;
+        // =========================
+        // Global App Config
+        // =========================
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        // =========================
+        // Load Config
+        // =========================
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update page title
+                document.title = `Players Management - ${data.websiteName}`;
+
+                // Update website name placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         async function checkSession() {
             try {
                 const res = await fetch('/api/dashboard', {
@@ -386,7 +445,8 @@
 
                 const roleFilter = document.getElementById('roleFilter').value;
                 const statusFilter = document.getElementById('statusFilter').value;
-
+                const search = document.getElementById('searchUsername')?.value.toLowerCase() || '';
+                
                 if (roleFilter) {
                     agents = agents.filter(a => a.role === roleFilter);
                 }
@@ -394,7 +454,11 @@
                 if (statusFilter) {
                     agents = agents.filter(a => a.status === statusFilter);
                 }
-                
+                if (search) {
+                    agents = agents.filter(a =>
+                        a.username.toLowerCase().includes(search)
+                    );
+                }
                 // SORTING
                 if (currentSort) {
                     agents.sort((a, b) => {
@@ -437,12 +501,13 @@
                         <td><p class="btn add">${a.username}</p></td>
                         <td>
                             <select class="action-dropdown ${!isDirect ? 'disabled' : ''}" 
-                                onchange="handleAgentAction(this, this.value, ${a.id}, ${a.points || 0}, ${a.commission_earnings || 0})">
+                                onchange="handleAgentAction(this, this.value, ${a.id}, '${a.username}', ${a.points || 0}, ${a.commission_earnings || 0})">
                                 <option value="">⚙️ Select Action</option>
                                 <option value="load">➕ Load</option>
                                 <option value="withdraw_load">💸 Withdraw Load</option>
                                 <option value="withdraw_commission">💰 Withdraw Commission</option>
                                 <option value="network">🌐 View Network</option>
+                                <option value="reset_password">🔑 Reset Password</option>
                             </select>
                         </td>
                         <td class="wallet-yellow">${formatPHP(a.points)}</td>
@@ -602,7 +667,7 @@
         // =========================
         // Handle dropdown actions
         // =========================
-        function handleAgentAction(selectEl, action, userId, points, commission) {
+        function handleAgentAction(selectEl, action, userId, username, points, commission) {
             if (!action) return;
 
             switch(action) {
@@ -619,23 +684,27 @@
                     break;
 
                 case 'network':
-                    openNetwork(userId);
+                    openNetwork(userId, username);
                     break;
 
                 case 'block':
                     toggleStatus(userId, 'offline');
                     break;
+                case 'reset_password':
+                    resetAgentPassword(userId);
+                    break;
+                
             }
 
             // ✅ SAFE reset
             selectEl.value = "";
         }
-        async function openNetwork(userId) {
+        async function openNetwork(userId, username) {
             document.getElementById('networkModal').style.display = 'flex';
             const container = document.getElementById('networkContent');
 
             // 👇 optional title update
-            document.querySelector('#networkModal h3').textContent = `Agent ${userId} Network`;
+            document.querySelector('#networkModal h3').textContent = `${username.toUpperCase()}'S NETWORK`;
 
             container.innerHTML = 'Loading...';
 
@@ -751,10 +820,52 @@
                 showSnackbar("Logout failed", "error");
             }
         }
+        function resetAgentPassword(userId) {
+            resetUserId = userId;
+            document.getElementById('resetPasswordModal').style.display = 'flex';
+        }
+        async function confirmResetPassword() {
+            try {
+                const res = await fetch('/api/reset-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ userId: resetUserId })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showSnackbar(data.error || "Reset failed");
+                    return;
+                }
+
+                showSnackbar(data.message || "Password reset successful", true);
+
+                closeResetPasswordModal();
+
+            } catch (err) {
+                console.error(err);
+                showSnackbar("Server error");
+            }
+        }
+        function closeResetPasswordModal() {
+            document.getElementById('resetPasswordModal').style.display = 'none';
+            resetUserId = null;
+        }
         // Call after session check
-        checkSession();
-        setInterval(loadWithdrawCount, 10000);
-        setInterval(loadPendingCount, 10000);
+        // =========================
+        // Init
+        // =========================
+        async function init() {
+            await loadConfig();
+            await checkSession();
+
+            setInterval(loadWithdrawCount, 10000);
+            setInterval(loadPendingCount, 10000);
+        }
+
+        init();
     </script>
 
 </body>

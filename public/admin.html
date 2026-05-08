@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dashboard - SWC423</title>
+    <title id="pageTitle">Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -135,13 +135,38 @@
 
         <!-- FOOTER -->
         <footer>
-            © 2024 SWC423. All rights reserved.
+            © 2024 <span class="website-name"></span>. All rights reserved.
         </footer>
 
     </div>
 
     <!-- JAVASCRIPT -->
     <script>
+        let APP_CONFIG = {
+            websiteName: "Website",
+            websiteUrl: window.location.origin
+        };
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                APP_CONFIG = data;
+
+                // Update title
+                document.title = `Dashboard - ${data.websiteName}`;
+
+                // Update all website name placeholders
+                document.querySelectorAll('.website-name')
+                    .forEach(el => {
+                        el.textContent = data.websiteName;
+                    });
+
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
         function formatNumber(num) {
             return Number(num || 0).toLocaleString(undefined, {
                 minimumFractionDigits: 2,
@@ -171,7 +196,7 @@
                     .forEach(el => el.textContent = data.username);
                 const membershipInput = document.querySelector('.membership-link');
                 if (membershipInput) {
-                    membershipInput.value = `https://SWC423.live/sign-up.html?ref=${data.id}`;
+                    membershipInput.value = `${APP_CONFIG.websiteUrl}/sign-up.html?ref=${data.id}`;
                 }
             } catch (err) {
                 console.error(err);
@@ -352,8 +377,13 @@
             }
         }
         // Call after session check
-        checkSession();
-        loadDashboardWallets();
+        async function init() {
+            await loadConfig();
+            await checkSession();
+            await loadDashboardWallets();
+        }
+
+        init();
         setInterval(loadWithdrawCount, 10000);
         setInterval(loadPendingCount, 10000);
         setInterval(loadDashboardWallets, 10000); // refresh every 10 sec
