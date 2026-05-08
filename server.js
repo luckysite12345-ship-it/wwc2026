@@ -1804,7 +1804,7 @@ app.get('/api/game-history', async (req, res) => {
                 ON g.event_name = ae.event_name
             WHERE g.winner IS NOT NULL
             ORDER BY g.id DESC
-            LIMIT 10`);
+            LIMIT 20`);
 
         res.json(result.rows);
 
