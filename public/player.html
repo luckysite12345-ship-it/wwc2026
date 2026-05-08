@@ -1047,7 +1047,7 @@ body, html {
 
             updateVideo(data); // ✅ ONLY THIS
             // ✅ APPLY STREAM STATE FROM DB
-            //handleStreamToggle(data.stream_enabled);
+            handleStreamToggle(data.stream_enabled);
         }catch(e){
             console.error(e);
         }
