@@ -2148,13 +2148,14 @@ app.post('/api/withdraw-points-player', isAuthenticated, async (req, res) => {
     res.status(500).json({ error: "Transaction failed" });
   }
 });
-// ==========================
-// MY RESULT API
-// ==========================
 app.get('/api/my-result', isAuthenticated, async (req, res) => {
+
     const client = await pool.connect();
 
     try {
+
+        await client.query('BEGIN');
+
         const userId = req.session.user.id;
 
         const gameRes = await client.query(`
@@ -2165,6 +2166,7 @@ app.get('/api/my-result', isAuthenticated, async (req, res) => {
         `);
 
         if (!gameRes.rows.length) {
+            await client.query('ROLLBACK');
             return res.json({ result: "NO_GAME" });
         }
 
@@ -2174,102 +2176,45 @@ app.get('/api/my-result', isAuthenticated, async (req, res) => {
         const winner = game.winner;
 
         if (!winner) {
+            await client.query('ROLLBACK');
             return res.json({ result: "PENDING" });
         }
 
-        // 🔒 Lock player's bet row
+        // 🔒 LOCK ALL UNRESOLVED BETS
         const betRes = await client.query(`
-            SELECT id, side, amount, is_resolved
+            SELECT id, side, amount
             FROM bets
             WHERE user_id = $1
               AND game_id = $2
+              AND is_resolved = false
             FOR UPDATE
         `, [userId, gameId]);
 
+        // already processed
         if (!betRes.rows.length) {
-            return res.json({ result: "NO_BET" });
-        }
 
-        const bet = betRes.rows[0];
-
-        // ==========================
-        // CANCELLED
-        // ==========================
-        if (winner === 'CANCELLED') {
-
-            if (!bet.is_resolved) {
-
-                await client.query('BEGIN');
-
-                // refund
-                await client.query(`
-                    UPDATE users
-                    SET points = points + $1
-                    WHERE id = $2
-                `, [bet.amount, userId]);
-
-                await client.query(`
-                    UPDATE bets
-                    SET is_resolved = true
-                    WHERE id = $1
-                `, [bet.id]);
-
-                await client.query(`
-                    INSERT INTO wallet_transactions
-                    (user_id, type, amount, balance_after, description)
-                    VALUES (
-                        $1,
-                        'credit',
-                        $2,
-                        (SELECT points FROM users WHERE id=$1),
-                        'Refund - Cancelled Game'
-                    )
-                `, [userId, bet.amount]);
-
-                await client.query('COMMIT');
-            }
+            await client.query('ROLLBACK');
 
             return res.json({
-                result: "CANCELLED",
-                refunded: true
+                result: "ALREADY_RESOLVED"
             });
         }
 
-        const isWin = bet.side === winner;
+        const bets = betRes.rows;
+
+        let totalPayout = 0;
+        let hasWin = false;
 
         // ==========================
-        // PLAYER LOST
+        // CALCULATE ODDS
         // ==========================
-        if (!isWin) {
+        let payouts = {
+            MERON: 0,
+            WALA: 0
+        };
 
-            if (!bet.is_resolved) {
-                await client.query(`
-                    UPDATE bets
-                    SET is_resolved = true
-                    WHERE id = $1
-                `, [bet.id]);
-            }
+        if (winner !== 'DRAW' && winner !== 'CANCELLED') {
 
-            return res.json({
-                result: "LOSE",
-                winAmount: 0
-            });
-        }
-
-        // ==========================
-        // PLAYER WON
-        // ==========================
-
-        let payout = 0;
-
-        // 🎯 DRAW
-        if (winner === 'DRAW') {
-
-            payout = Number((bet.amount * 8).toFixed(2));
-
-        } else {
-
-            // 🔥 Calculate live odds
             const totalsRes = await client.query(`
                 SELECT
                     COALESCE(SUM(CASE WHEN side='MERON' THEN amount END),0) AS meron,
@@ -2288,67 +2233,96 @@ app.get('/api/my-result', isAuthenticated, async (req, res) => {
             let CUT = 0;
 
             if (meron > 0 && wala > 0) {
-                CUT = (2 * TARGET_AVG * meron * wala) / ((meron + wala) ** 2);
+                CUT = (2 * TARGET_AVG * meron * wala) /
+                      ((meron + wala) ** 2);
             }
 
             const MIN_CUT = 0.70;
             CUT = Math.max(MIN_CUT, CUT);
 
-            const payouts = {
+            payouts = {
                 MERON: meron > 0 ? (totalPool / meron) * CUT : 0,
                 WALA: wala > 0 ? (totalPool / wala) * CUT : 0
             };
-
-            payout = Number((bet.amount * payouts[winner]).toFixed(2));
-        }
-
-        // already paid
-        if (bet.is_resolved) {
-            return res.json({
-                result: "WIN",
-                winAmount: payout,
-                alreadyPaid: true
-            });
         }
 
         // ==========================
-        // PAY WINNER
+        // PROCESS ALL BETS
         // ==========================
-        await client.query('BEGIN');
+        for (const bet of bets) {
 
-        await client.query(`
-            UPDATE users
-            SET points = points + $1
-            WHERE id = $2
-        `, [payout, userId]);
+            let payout = 0;
 
-        await client.query(`
-            UPDATE bets
-            SET is_resolved = true
-            WHERE id = $1
-        `, [bet.id]);
+            // CANCELLED = refund
+            if (winner === 'CANCELLED') {
 
-        await client.query(`
-            INSERT INTO wallet_transactions
-            (user_id, type, amount, balance_after, description)
-            VALUES (
-                $1,
-                'credit',
-                $2,
-                (SELECT points FROM users WHERE id=$1),
-                $3
-            )
-        `, [
-            userId,
-            payout,
-            `Win - ${winner}`
-        ]);
+                payout = Number(bet.amount);
+
+            }
+
+            // DRAW
+            else if (winner === 'DRAW') {
+
+                if (bet.side === 'DRAW') {
+                    payout = Number((bet.amount * 8).toFixed(2));
+                    hasWin = true;
+                } else {
+                    payout = Number(bet.amount);
+                }
+
+            }
+
+            // NORMAL WIN
+            else if (bet.side === winner) {
+
+                payout = Number(
+                    (bet.amount * payouts[winner]).toFixed(2)
+                );
+
+                hasWin = true;
+            }
+
+            // CREDIT PLAYER
+            if (payout > 0) {
+
+                totalPayout += payout;
+
+                await client.query(`
+                    UPDATE users
+                    SET points = points + $1
+                    WHERE id = $2
+                `, [payout, userId]);
+
+                await client.query(`
+                    INSERT INTO wallet_transactions
+                    (user_id, type, amount, balance_after, description)
+                    VALUES (
+                        $1,
+                        'credit',
+                        $2,
+                        (SELECT points FROM users WHERE id=$1),
+                        $3
+                    )
+                `, [
+                    userId,
+                    payout,
+                    `Win - ${winner}`
+                ]);
+            }
+
+            // MARK RESOLVED
+            await client.query(`
+                UPDATE bets
+                SET is_resolved = true
+                WHERE id = $1
+            `, [bet.id]);
+        }
 
         await client.query('COMMIT');
 
         res.json({
-            result: "WIN",
-            winAmount: payout
+            result: hasWin ? "WIN" : "LOSE",
+            winAmount: totalPayout
         });
 
     } catch (err) {
@@ -2358,9 +2332,13 @@ app.get('/api/my-result', isAuthenticated, async (req, res) => {
         } catch {}
 
         console.error(err);
-        res.status(500).json({ error: "Server error" });
+
+        res.status(500).json({
+            error: "Server error"
+        });
 
     } finally {
+
         client.release();
     }
 });
