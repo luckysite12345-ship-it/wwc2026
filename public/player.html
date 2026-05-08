@@ -1155,7 +1155,7 @@ body, html {
         const MAX_ROWS = 6;
 
         // 🔥 ensure correct order even if backend changes
-        history.sort((a, b) => a.fight_number - b.fight_number);
+        history.sort((a, b) => a.id - b.id);
 
         let columns = [];
         let currentCol = [];
