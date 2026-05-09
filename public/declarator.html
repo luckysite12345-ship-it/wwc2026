@@ -557,11 +557,41 @@ button:disabled {
     }
 
     async function toggleStream(state){
-        await fetch('/api/declarator/toggle-stream',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({enabled:state})
-        });
+        try {
+
+            const res = await fetch('/api/declarator/toggle-stream',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    enabled: state
+                })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                return showSnackbar(data.error || "Failed to toggle stream", "error");
+            }
+
+            // ✅ UPDATE INDICATOR ONLY AFTER SUCCESS
+            const indicator = document.getElementById('streamIndicator');
+
+            if (state) {
+                indicator.textContent = "🟢 STREAM STATUS: ON";
+                indicator.style.background = "#14532d";
+                indicator.style.color = "#22c55e";
+            } else {
+                indicator.textContent = "🔴 STREAM STATUS: OFF";
+                indicator.style.background = "#7f1d1d";
+                indicator.style.color = "#f87171";
+            }
+
+            showSnackbar(`Stream turned ${state ? 'ON' : 'OFF'}`);
+
+        } catch(err){
+            console.error(err);
+            showSnackbar("Failed to toggle stream", "error");
+        }
     }
 
     async function placeChip(amount){
@@ -872,17 +902,7 @@ button:disabled {
         //toggleBtn(streamOnBtn, !streamEnabled);
         //toggleBtn(streamOffBtn, streamEnabled);
 
-        const indicator = document.getElementById('streamIndicator');
-
-        if (streamEnabled) {
-            indicator.textContent = "🟢 STREAM STATUS: ON";
-            indicator.style.background = "#14532d";
-            indicator.style.color = "#22c55e";
-        } else {
-            indicator.textContent = "🔴 STREAM STATUS: OFF";
-            indicator.style.background = "#7f1d1d";
-            indicator.style.color = "#f87171";
-        }
+        
     }
 
     function toggleBtn(btn, enabled){
