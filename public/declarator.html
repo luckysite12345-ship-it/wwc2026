@@ -209,6 +209,16 @@ button:disabled {
             <button id="btnStreamOn" class="bet-btn" onclick="toggleStream(true)">Stream ON</button>
             <button id="btnStreamOff" class="bet-btn" onclick="toggleStream(false)">Stream OFF</button>
         </div>
+        <div id="streamIndicator" style="
+            margin-top:10px;
+            text-align:center;
+            font-weight:bold;
+            padding:10px;
+            border-radius:8px;
+            background:#334155;
+        ">
+            STREAM STATUS: OFF
+        </div>
     </div>
     <div class="bets-container">
     <div class="bet-column">
@@ -860,7 +870,19 @@ button:disabled {
 
         // 📺 STREAM
         toggleBtn(streamOnBtn, !streamEnabled);
-        toggleBtn(streamOffBtn, !streamEnabled);
+        toggleBtn(streamOffBtn, streamEnabled);
+
+        const indicator = document.getElementById('streamIndicator');
+
+        if (streamEnabled) {
+            indicator.textContent = "🟢 STREAM STATUS: ON";
+            indicator.style.background = "#14532d";
+            indicator.style.color = "#22c55e";
+        } else {
+            indicator.textContent = "🔴 STREAM STATUS: OFF";
+            indicator.style.background = "#7f1d1d";
+            indicator.style.color = "#f87171";
+        }
     }
 
     function toggleBtn(btn, enabled){
