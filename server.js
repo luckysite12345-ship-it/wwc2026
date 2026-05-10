@@ -1552,6 +1552,47 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
     }
 
     const game = gameRes.rows[0];
+    // ==========================
+    // COMPUTE FINAL ODDS
+    // ==========================
+    const totalsRes = await pool.query(`
+      SELECT
+        COALESCE(SUM(CASE WHEN side='MERON' THEN amount END),0) AS meron,
+        COALESCE(SUM(CASE WHEN side='WALA' THEN amount END),0) AS wala
+      FROM bets
+      WHERE game_id = $1
+        AND is_dummy = false
+    `, [game.id]);
+
+    const meron = Number(totalsRes.rows[0].meron);
+    const wala = Number(totalsRes.rows[0].wala);
+
+    const totalPool = meron + wala;
+
+    // ==========================
+    // YOUR ODDS FORMULA
+    // ==========================
+    const TARGET_AVG = 1.83;
+
+    let CUT = 0;
+
+    if (meron > 0 && wala > 0) {
+      CUT = (
+        2 * TARGET_AVG * meron * wala
+      ) / ((meron + wala) ** 2);
+    }
+
+    const MIN_CUT = 0.70;
+
+    CUT = Math.max(MIN_CUT, CUT);
+
+    const meronOdds = meron > 0
+      ? (totalPool / meron) * CUT
+      : 0;
+
+    const walaOdds = wala > 0
+      ? (totalPool / wala) * CUT
+      : 0;
 
     // 2. STOP ENGINE SAFELY (IMPORTANT)
     try {
@@ -1563,10 +1604,17 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
     // 3. UPDATE SPECIFIC GAME
     const updateRes = await pool.query(`
       UPDATE games
-      SET status='CLOSED'
-      WHERE id=$1
+      SET
+        status = 'CLOSED',
+        meron_odds = $1,
+        wala_odds = $2
+      WHERE id = $3
       RETURNING *
-    `, [game.id]);
+    `, [
+      meronOdds.toFixed(4),
+      walaOdds.toFixed(4),
+      game.id
+    ]);
 
     await upsertActiveEvent({
       gameId: game.id,
