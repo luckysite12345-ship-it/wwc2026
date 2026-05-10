@@ -2,9 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 const pool = require('../db/connection');
-const { isAuthenticated } = require('../middleware/auth');
 
-router.get('/current-bets', isAuthenticated, async (req, res) => {
+router.get('/current-bets', async (req, res) => {
     try {
 
         const meron = await pool.query(`
