@@ -832,7 +832,7 @@ body, html {
             document.getElementById('payoutWala').textContent =
                 (payoutWala).toFixed(2);
             document.getElementById('payoutDraw').textContent =
-                payoutDraw + "x";
+                (payoutDraw).toFixed(2) + "x";
             const myMeron = Number(data.myMeron || 0);
             const myWala = Number(data.myWala || 0);
             const myDraw = Number(data.myDraw || 0);
@@ -846,13 +846,13 @@ body, html {
 
             if (!currentInput){
                 document.getElementById('winMeron').textContent =
-                    (myMeron * payoutMeron).toFixed(2);
+                    (myMeron.toFixed(2) * payoutMeron.toFixed(2)).toFixed(2);
 
                 document.getElementById('winWala').textContent =
-                    (myWala * payoutWala).toFixed(2);
+                    (myWala.toFixed(2) * payoutWala.toFixed(2)).toFixed(2);
 
                 document.getElementById('winDraw').textContent =
-                    (myDraw * payoutDraw).toFixed(2);
+                    (myDraw.toFixed(2) * payoutDraw.toFixed(2)).toFixed(2);
             }
                     
 
