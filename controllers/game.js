@@ -47,8 +47,8 @@ async function distributeCommission(userId, amount, gameId, betId) {
 
             await pool.query(`
                 INSERT INTO commission_transactions
-                (user_id, source_user_id, game_id, bet_id, amount, rate, level, base_amount)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                (user_id, source_user_id, game_id, bet_id, amount, rate, level, base_amount, status)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             `,[
                 parent.id,
                 userId,
@@ -57,7 +57,8 @@ async function distributeCommission(userId, amount, gameId, betId) {
                 commission,
                 diffRate,
                 level,
-                amount
+                amount,
+                1
             ]);
 
             prevRate = parentRate;
