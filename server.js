@@ -1768,7 +1768,7 @@ app.post('/api/declare-winner', isAuthenticated, async (req, res) => {
                 `, [
                     bet.user_id,
                     payout,
-                    `Game Result - ${winner}`
+                    `WIN - ${winner}`
                 ]);
             }
 
