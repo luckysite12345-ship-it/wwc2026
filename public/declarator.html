@@ -209,16 +209,6 @@ button:disabled {
             <button id="btnStreamOn" class="bet-btn" onclick="toggleStream(true)">Stream ON</button>
             <button id="btnStreamOff" class="bet-btn" onclick="toggleStream(false)">Stream OFF</button>
         </div>
-        <div id="streamIndicator" style="
-            margin-top:10px;
-            text-align:center;
-            font-weight:bold;
-            padding:10px;
-            border-radius:8px;
-            background:#334155;
-        ">
-            STREAM STATUS: OFF
-        </div>
     </div>
     <div class="bets-container">
     <div class="bet-column">
@@ -557,41 +547,11 @@ button:disabled {
     }
 
     async function toggleStream(state){
-        try {
-
-            const res = await fetch('/api/declarator/toggle-stream',{
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({
-                    enabled: state
-                })
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                return showSnackbar(data.error || "Failed to toggle stream", "error");
-            }
-
-            // ✅ UPDATE INDICATOR ONLY AFTER SUCCESS
-            const indicator = document.getElementById('streamIndicator');
-
-            if (state) {
-                indicator.textContent = "🟢 STREAM STATUS: ON";
-                indicator.style.background = "#14532d";
-                indicator.style.color = "#22c55e";
-            } else {
-                indicator.textContent = "🔴 STREAM STATUS: OFF";
-                indicator.style.background = "#7f1d1d";
-                indicator.style.color = "#f87171";
-            }
-
-            showSnackbar(`Stream turned ${state ? 'ON' : 'OFF'}`);
-
-        } catch(err){
-            console.error(err);
-            showSnackbar("Failed to toggle stream", "error");
-        }
+        await fetch('/api/declarator/toggle-stream',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({enabled:state})
+        });
     }
 
     async function placeChip(amount){
@@ -899,10 +859,8 @@ button:disabled {
         });
 
         // 📺 STREAM
-        //toggleBtn(streamOnBtn, !streamEnabled);
-        //toggleBtn(streamOffBtn, streamEnabled);
-
-        
+        toggleBtn(streamOnBtn, !streamEnabled);
+        toggleBtn(streamOffBtn, !streamEnabled);
     }
 
     function toggleBtn(btn, enabled){
