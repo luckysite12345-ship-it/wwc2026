@@ -298,6 +298,9 @@ const buildGameState = async (userId) => {
       g.fight_number,
       g.status,
 
+      g.meron_odds,
+      g.wala_odds,
+
       COALESCE(SUM(CASE WHEN b.side='MERON' THEN b.amount END),0) AS "totalMeron",
       COALESCE(SUM(CASE WHEN b.side='WALA' THEN b.amount END),0) AS "totalWala",
       COALESCE(SUM(CASE WHEN b.side='DRAW' THEN b.amount END),0) AS "totalDraw",
@@ -335,6 +338,8 @@ const buildGameState = async (userId) => {
   return {
     fightNumber: data.fight_number,
     status: data.status,
+    meron_odds: Number(data.meron_odds),
+    wala_odds: Number(data.wala_odds),
     totalMeron: Number(data.totalMeron),
     totalWala: Number(data.totalWala),
     totalDraw: Number(data.totalDraw),
@@ -1592,7 +1597,9 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
       announcement: `Betting Closed`,
     });
     broadcast("GAME_CLOSED", {
-      gameId: game.id
+        gameId: game.id,
+        meronOdds: Number(updateRes.rows[0].meron_odds),
+        walaOdds: Number(updateRes.rows[0].wala_odds)
     });
     const gameState = await buildGameState(req.session.user.id);
     const bets = await buildBetList();

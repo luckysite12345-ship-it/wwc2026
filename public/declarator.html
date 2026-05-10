@@ -273,6 +273,8 @@ button:disabled {
 </div>
 <script>
     let lastBetCount = 0;
+    let frozenMeronOdds = null;
+    let frozenWalaOdds = null;
     let game = {};
     let userId = null;
     let pendingBet = {
@@ -409,6 +411,18 @@ button:disabled {
                     } else {
                         showSnackbar(msg.error || "Bet failed", "error");
                     }
+                    break;
+                case "GAME_CLOSED":
+
+                    frozenMeronOdds = msg.payload.meronOdds;
+                    frozenWalaOdds = msg.payload.walaOdds;
+
+                    document.getElementById('payoutMeron').textContent =
+                        Number(frozenMeronOdds).toFixed(2);
+
+                    document.getElementById('payoutWala').textContent =
+                        Number(frozenWalaOdds).toFixed(2);
+
                     break;
             }
         };
@@ -663,11 +677,37 @@ button:disabled {
         const MIN_CUT = 0.70;
         CUT = Math.max(MIN_CUT, CUT);
 
-        const payoutMeron = data.totalMeron ? (totalPool / data.totalMeron) * CUT : 0;
-        const payoutWala = data.totalWala ? (totalPool / data.totalWala) * CUT : 0;
+        if (data.status === 'CLOSED' || data.status === 'RESOLVED') {
 
-        document.getElementById('payoutMeron').textContent = payoutMeron.toFixed(2);
-        document.getElementById('payoutWala').textContent = payoutWala.toFixed(2);
+            document.getElementById('payoutMeron').textContent =
+                Number(data.meron_odds || frozenMeronOdds || 0).toFixed(2);
+
+            document.getElementById('payoutWala').textContent =
+                Number(data.wala_odds || frozenWalaOdds || 0).toFixed(2);
+
+        } else {
+
+            // LIVE ODDS ONLY WHILE OPEN
+
+            const payoutMeron = data.totalMeron
+                ? (totalPool / data.totalMeron) * CUT
+                : 0;
+
+            const payoutWala = data.totalWala
+                ? (totalPool / data.totalWala) * CUT
+                : 0;
+
+            currentMeronOdds = payoutMeron;
+            currentWalaOdds = payoutWala;
+
+            document.getElementById('payoutMeron').textContent =
+                payoutMeron.toFixed(2);
+
+            document.getElementById('payoutWala').textContent =
+                payoutWala.toFixed(2);
+        }
+
+        
 
         // status
         const status = document.getElementById('betStatus');

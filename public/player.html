@@ -362,6 +362,8 @@ body, html {
 </div> <!-- main -->
 
 <script>
+    let frozenMeronOdds = null;
+    let frozenWalaOdds = null;
     let game = {};
     let payoutMeron = 0;
     let payoutWala = 0;
@@ -518,6 +520,28 @@ body, html {
             case "VIDEO_UPDATE":
                 updateVideo(data.payload.video_url);
                 break;
+            case "GAME_CLOSED":
+
+                frozenMeronOdds = Number(data.meronOdds || 0);
+                frozenWalaOdds = Number(data.walaOdds || 0);
+
+                // update UI instantly
+                document.getElementById('payoutMeron').textContent =
+                    frozenMeronOdds.toFixed(2);
+
+                document.getElementById('payoutWala').textContent =
+                    frozenWalaOdds.toFixed(2);
+
+                // recompute winnings using frozen odds
+                document.getElementById('winMeron').textContent =
+                    (myBets.meron * frozenMeronOdds).toFixed(2);
+
+                document.getElementById('winWala').textContent =
+                    (myBets.wala * frozenWalaOdds).toFixed(2);
+
+                showSnackbar("Betting Closed");
+
+                break;
         }
     }
     function updateGameUI(data){
@@ -570,8 +594,16 @@ body, html {
         CUT = Math.max(MIN_CUT, CUT);
 
         // 🎲 FINAL ODDS
-        payoutMeron = A ? (totalPool / A) * CUT : 0;
-        payoutWala  = B ? (totalPool / B) * CUT : 0;
+        if (data.status === 'CLOSED' || data.status === 'RESOLVED') {
+
+            payoutMeron = Number(data.meron_odds || frozenMeronOdds || 0);
+            payoutWala  = Number(data.wala_odds || frozenWalaOdds || 0);
+
+        } else {
+
+            payoutMeron = A ? (totalPool / A) * CUT : 0;
+            payoutWala  = B ? (totalPool / B) * CUT : 0;
+        }
 
 
         const DRAW_MULTIPLIER = 8;
