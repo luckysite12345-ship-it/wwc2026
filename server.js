@@ -508,9 +508,6 @@ app.use(express.static('public', {
 
 
 
-
-
-
 // ==========================
 // PENDING COUNT API
 // ==========================
@@ -1595,291 +1592,67 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
   }
 });
 // ==========================
-// DECLARE WINNER (DECLARATOR ONLY)
+//  DECLARE WINNER (DECLARATOR ONLY)
 // ==========================
 app.post('/api/declare-winner', isAuthenticated, async (req, res) => {
+  const { winner } = req.body;
 
-    const { winner } = req.body;
+  stopDummyEngine();
 
-    stopDummyEngine();
-
-    const client = await pool.connect();
-
-    try {
-
-        if (req.session.user.role !== 'declarator') {
-            return res.status(403).json({
-                error: "Unauthorized"
-            });
-        }
-
-        await client.query('BEGIN');
-
-        // ==========================
-        // RESOLVE CURRENT CLOSED GAME
-        // ==========================
-        const gameRes = await client.query(`
-            UPDATE games
-            SET winner = $1,
-                status = 'RESOLVED'
-            WHERE status = 'CLOSED'
-            RETURNING *
-        `, [winner]);
-
-        if (!gameRes.rows.length) {
-
-            await client.query('ROLLBACK');
-
-            return res.status(400).json({
-                error: "No closed game to resolve"
-            });
-        }
-
-        const game = gameRes.rows[0];
-        const gameId = game.id;
-
-        // ==========================
-        // LOCK UNRESOLVED REAL BETS
-        // ==========================
-        const betsRes = await client.query(`
-            SELECT
-                b.id,
-                b.user_id,
-                b.side,
-                b.amount,
-                u.points
-            FROM bets b
-            JOIN users u ON u.id = b.user_id
-            WHERE b.game_id = $1
-              AND b.is_dummy = false
-              AND b.is_resolved = false
-            FOR UPDATE
-        `, [gameId]);
-
-        const bets = betsRes.rows;
-
-        // ==========================
-        // CALCULATE ODDS
-        // ==========================
-        let payouts = {
-            MERON: 0,
-            WALA: 0
-        };
-
-        if (winner !== 'DRAW' && winner !== 'CANCELLED') {
-
-            const totalsRes = await client.query(`
-                SELECT
-                    COALESCE(SUM(CASE WHEN side='MERON' THEN amount END),0) AS meron,
-                    COALESCE(SUM(CASE WHEN side='WALA' THEN amount END),0) AS wala
-                FROM bets
-                WHERE game_id = $1
-                  AND is_dummy = false
-            `, [gameId]);
-
-            const meron = Number(totalsRes.rows[0].meron);
-            const wala = Number(totalsRes.rows[0].wala);
-
-            const totalPool = meron + wala;
-
-            const TARGET_AVG = 1.83;
-
-            let CUT = 0;
-
-            if (meron > 0 && wala > 0) {
-
-                CUT = (
-                    2 * TARGET_AVG * meron * wala
-                ) / ((meron + wala) ** 2);
-            }
-
-            const MIN_CUT = 0.70;
-
-            CUT = Math.max(MIN_CUT, CUT);
-
-            payouts = {
-                MERON: meron > 0
-                    ? (totalPool / meron) * CUT
-                    : 0,
-
-                WALA: wala > 0
-                    ? (totalPool / wala) * CUT
-                    : 0
-            };
-        }
-
-        // ==========================
-        // PROCESS ALL BETS
-        // ==========================
-        for (const bet of bets) {
-
-            let payout = 0;
-            let resultStatus = 'LOSE';
-
-            // ==========================
-            // CANCELLED = REFUND
-            // ==========================
-            if (winner === 'CANCELLED') {
-
-                payout = Number(bet.amount);
-
-                resultStatus = 'REFUND';
-            }
-
-            // ==========================
-            // DRAW LOGIC
-            // ==========================
-            else if (winner === 'DRAW') {
-
-                if (bet.side === 'DRAW') {
-
-                    payout = Number(
-                        (bet.amount * 8).toFixed(2)
-                    );
-
-                    resultStatus = 'WIN';
-
-                } else {
-
-                    payout = Number(bet.amount);
-
-                    resultStatus = 'REFUND';
-                }
-            }
-
-            // ==========================
-            // NORMAL WIN
-            // ==========================
-            else if (bet.side === winner) {
-
-                payout = Number(
-                    (bet.amount * payouts[winner]).toFixed(2)
-                );
-
-                resultStatus = 'WIN';
-            }
-
-            // ==========================
-            // CREDIT USER
-            // ==========================
-            if (payout > 0) {
-
-                await client.query(`
-                    UPDATE users
-                    SET points = points + $1
-                    WHERE id = $2
-                `, [
-                    payout,
-                    bet.user_id
-                ]);
-
-                await client.query(`
-                    INSERT INTO wallet_transactions
-                    (
-                        user_id,
-                        type,
-                        amount,
-                        balance_after,
-                        description
-                    )
-                    VALUES (
-                        $1,
-                        'credit',
-                        $2,
-                        (SELECT points FROM users WHERE id=$1),
-                        $3
-                    )
-                `, [
-                    bet.user_id,
-                    payout,
-                    `Game Result - ${winner}`
-                ]);
-            }
-
-            // ==========================
-            // MARK BET RESOLVED
-            // ==========================
-            await client.query(`
-                UPDATE bets
-                SET
-                    is_resolved = true
-                WHERE id = $1
-            `, [bet.id]);
-        }
-
-        // ==========================
-        // COMMIT EVERYTHING
-        // ==========================
-        await client.query('COMMIT');
-
-        // ==========================
-        // BROADCASTS
-        // ==========================
-        broadcast("GAME_RESULT", {
-            winner
-        });
-
-        const gameState = await buildGameState(
-            req.session.user.id
-        );
-
-        const betList = await buildBetList();
-
-        broadcast("STATE_UPDATE", {
-            game: gameState,
-            bets: betList
-        });
-
-        // ==========================
-        // ANNOUNCEMENT
-        // ==========================
-        let announcementText = "";
-
-        if (winner === "CANCELLED") {
-
-            announcementText =
-                "GAME CANCELLED - ALL BETS REFUNDED";
-
-        } else {
-
-            announcementText =
-                `${winner} WINS!`;
-        }
-
-        await upsertActiveEvent({
-            gameId: gameId,
-            event_name: "",
-            announcement: announcementText,
-        });
-
-        broadcast("EVENT_UPDATE", {
-            announcement: announcementText
-        });
-
-        // ==========================
-        // RESPONSE
-        // ==========================
-        res.json({
-            message: "Winner declared and settled",
-            game
-        });
-
-    } catch (err) {
-
-        try {
-            await client.query('ROLLBACK');
-        } catch {}
-
-        console.error(err);
-
-        res.status(500).json({
-            error: "Server error"
-        });
-
-    } finally {
-
-        client.release();
+  try {
+    if (req.session.user.role !== 'declarator') {
+      return res.status(403).json({ error: "Unauthorized" });
     }
+
+    const result = await pool.query(`
+      UPDATE games
+      SET winner=$1, status='RESOLVED'
+      WHERE status='CLOSED'
+      RETURNING *
+    `, [winner]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: "No closed game to resolve" });
+    }
+
+    const gameId = result.rows[0].id;
+
+    // 🔥 VERY IMPORTANT (THIS WAS MISSING)
+    await settleGame(gameId, winner);
+
+    broadcast("GAME_RESULT", { winner });
+    const gameState = await buildGameState(req.session.user.id);
+    const bets = await buildBetList();
+
+    broadcast("STATE_UPDATE", {
+      game: gameState,
+      bets
+    });
+    let announcementText = "";
+
+    if (winner === "CANCELLED") {
+      announcementText = "GAME CANCELLED - ALL BETS REFUNDED";
+    } else {
+      announcementText = `${winner} WINS!`;
+    }
+
+    await upsertActiveEvent({
+      gameId: gameId,
+      event_name: "",
+      announcement: announcementText,
+    });
+    broadcast("EVENT_UPDATE", {
+      announcement: announcementText
+    });
+    res.json({
+      message: "Winner declared",
+      game: result.rows[0]
+    });
+    
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // ==========================
@@ -2372,198 +2145,61 @@ app.post('/api/withdraw-points-player', isAuthenticated, async (req, res) => {
     res.status(500).json({ error: "Transaction failed" });
   }
 });
+// ==========================
+// MY RESULT API (TO SHOW WIN/LOSE STATUS AND WIN AMOUNT AFTER GAME IS RESOLVED)
+// ==========================
 app.get('/api/my-result', isAuthenticated, async (req, res) => {
-
-    const client = await pool.connect();
-
     try {
-
-        await client.query('BEGIN');
-
         const userId = req.session.user.id;
 
-        const gameRes = await client.query(`
-            SELECT id, winner
-            FROM games
+        const gameRes = await pool.query(`
+            SELECT id FROM games
             ORDER BY created_at DESC
             LIMIT 1
         `);
 
         if (!gameRes.rows.length) {
-            await client.query('ROLLBACK');
             return res.json({ result: "NO_GAME" });
         }
 
-        const game = gameRes.rows[0];
+        const gameId = gameRes.rows[0].id;
 
-        const gameId = game.id;
-        const winner = game.winner;
+        const betRes = await pool.query(`
+            SELECT side, amount
+            FROM bets
+            WHERE user_id = $1 AND game_id = $2
+        `, [userId, gameId]);
+
+        if (!betRes.rows.length) {
+            return res.json({ result: "NO_BET" });
+        }
+
+        const bet = betRes.rows[0];
+
+        const gameResultRes = await pool.query(`
+            SELECT winner FROM games WHERE id = $1
+        `, [gameId]);
+
+        const winner = gameResultRes.rows[0].winner;
 
         if (!winner) {
-            await client.query('ROLLBACK');
             return res.json({ result: "PENDING" });
         }
 
-        // 🔒 LOCK ALL UNRESOLVED BETS
-        const betRes = await client.query(`
-            SELECT id, side, amount
-            FROM bets
-            WHERE user_id = $1
-              AND game_id = $2
-              AND is_resolved = false
-            FOR UPDATE
-        `, [userId, gameId]);
-
-        // already processed
-        if (!betRes.rows.length) {
-
-            await client.query('ROLLBACK');
-
-            return res.json({
-                result: "ALREADY_RESOLVED"
-            });
+        if (winner === "CANCELLED") {
+            return res.json({ result: "CANCELLED" });
         }
 
-        const bets = betRes.rows;
-
-        let totalPayout = 0;
-        let hasWin = false;
-
-        // ==========================
-        // CALCULATE ODDS
-        // ==========================
-        let payouts = {
-            MERON: 0,
-            WALA: 0
-        };
-
-        if (winner !== 'DRAW' && winner !== 'CANCELLED') {
-
-            const totalsRes = await client.query(`
-                SELECT
-                    COALESCE(SUM(CASE WHEN side='MERON' THEN amount END),0) AS meron,
-                    COALESCE(SUM(CASE WHEN side='WALA' THEN amount END),0) AS wala
-                FROM bets
-                WHERE game_id = $1
-            `, [gameId]);
-
-            const meron = Number(totalsRes.rows[0].meron);
-            const wala = Number(totalsRes.rows[0].wala);
-
-            const totalPool = meron + wala;
-
-            const TARGET_AVG = 1.83;
-
-            let CUT = 0;
-
-            if (meron > 0 && wala > 0) {
-                CUT = (2 * TARGET_AVG * meron * wala) /
-                      ((meron + wala) ** 2);
-            }
-
-            const MIN_CUT = 0.70;
-            CUT = Math.max(MIN_CUT, CUT);
-
-            payouts = {
-                MERON: meron > 0 ? (totalPool / meron) * CUT : 0,
-                WALA: wala > 0 ? (totalPool / wala) * CUT : 0
-            };
-        }
-
-        // ==========================
-        // PROCESS ALL BETS
-        // ==========================
-        for (const bet of bets) {
-
-            let payout = 0;
-
-            // CANCELLED = refund
-            if (winner === 'CANCELLED') {
-
-                payout = Number(bet.amount);
-
-            }
-
-            // DRAW
-            else if (winner === 'DRAW') {
-
-                if (bet.side === 'DRAW') {
-                    payout = Number((bet.amount * 8).toFixed(2));
-                    hasWin = true;
-                } else {
-                    payout = Number(bet.amount);
-                }
-
-            }
-
-            // NORMAL WIN
-            else if (bet.side === winner) {
-
-                payout = Number(
-                    (bet.amount * payouts[winner]).toFixed(2)
-                );
-
-                hasWin = true;
-            }
-
-            // CREDIT PLAYER
-            if (payout > 0) {
-
-                totalPayout += payout;
-
-                await client.query(`
-                    UPDATE users
-                    SET points = points + $1
-                    WHERE id = $2
-                `, [payout, userId]);
-
-                await client.query(`
-                    INSERT INTO wallet_transactions
-                    (user_id, type, amount, balance_after, description)
-                    VALUES (
-                        $1,
-                        'credit',
-                        $2,
-                        (SELECT points FROM users WHERE id=$1),
-                        $3
-                    )
-                `, [
-                    userId,
-                    payout,
-                    `Win - ${winner}`
-                ]);
-            }
-
-            // MARK RESOLVED
-            await client.query(`
-                UPDATE bets
-                SET is_resolved = true
-                WHERE id = $1
-            `, [bet.id]);
-        }
-
-        await client.query('COMMIT');
+        const isWin = bet.side === winner;
 
         res.json({
-            result: hasWin ? "WIN" : "LOSE",
-            winAmount: totalPayout
+            result: isWin ? "WIN" : "LOSE",
+            winAmount: isWin ? bet.amount : 0 // optional calc
         });
 
     } catch (err) {
-
-        try {
-            await client.query('ROLLBACK');
-        } catch {}
-
         console.error(err);
-
-        res.status(500).json({
-            error: "Server error"
-        });
-
-    } finally {
-
-        client.release();
+        res.status(500).json({ error: "Server error" });
     }
 });
 // ==========================
