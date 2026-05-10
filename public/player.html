@@ -577,13 +577,13 @@ body, html {
         const DRAW_MULTIPLIER = 8;
         payoutDraw = DRAW_MULTIPLIER;
         document.getElementById('winMeron').textContent =
-            (myBets.meron * payoutMeron).toFixed(2);
+            (myBets.meron.toFixed(2) * payoutMeron.toFixed(2)).toFixed(2);
 
         document.getElementById('winWala').textContent =
-            (myBets.wala * payoutWala).toFixed(2);
+            (myBets.wala.toFixed(2) * payoutWala.toFixed(2)).toFixed(2);
 
         document.getElementById('winDraw').textContent =
-            (myBets.draw * payoutDraw).toFixed(2);
+            (myBets.draw.toFixed(2) * payoutDraw.toFixed(2)).toFixed(2);
         // ✅ Update payout UI only if changed
         const payoutMeronEl = document.getElementById('payoutMeron');
         const payoutWalaEl = document.getElementById('payoutWala');
@@ -591,7 +591,7 @@ body, html {
 
         const newMeronText = payoutMeron.toFixed(2);
         const newWalaText = payoutWala.toFixed(2);
-        const newDrawText = payoutDraw + "x";
+        const newDrawText = payoutDraw.toFixed(2) + "x";
 
         if (payoutMeronEl.textContent !== newMeronText) {
             payoutMeronEl.textContent = newMeronText;
