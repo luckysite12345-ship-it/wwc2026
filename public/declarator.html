@@ -833,20 +833,16 @@ button:disabled {
             // 🎥 VIDEO
             const frame = document.getElementById('videoFrame');
 
-            if (frame) {
-
-                let url = video_url;
+            if (frame && data.video_url) {
+                let url = data.video_url;
 
                 if (!url.includes("autoplay=1")) {
                     url += (url.includes("?") ? "&" : "?") + "autoplay=1&mute=1";
                 }
 
-                // 🔥 FORCE iframe refresh
-                frame.src = "";
-
-                setTimeout(() => {
+                if (frame.src !== url) {
                     frame.src = url;
-                }, 100);
+                }
             }
 
         }catch(err){
