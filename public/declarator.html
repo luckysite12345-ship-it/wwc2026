@@ -1048,10 +1048,23 @@ button:disabled {
         const data = await res.json();
         updateEventUI(data);
     }
-   
+    async function fetchBets() {
+        try {
+            const res = await fetch('/api/current-bets', {
+                credentials: 'include'
+            });
+
+            const data = await res.json();
+
+            renderBets(data);
+
+        } catch (err) {
+            console.error("Failed to fetch bets:", err);
+        }
+    }
     fetchGame();
     fetchEvent();
-
+    fetchBets();
     
    
 
