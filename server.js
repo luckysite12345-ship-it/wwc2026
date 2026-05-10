@@ -1718,11 +1718,20 @@ app.post('/api/declare-winner', isAuthenticated, async (req, res) => {
 
             const totalsRes = await client.query(`
                 SELECT
-                    COALESCE(SUM(CASE WHEN side='MERON' THEN amount END),0) AS meron,
-                    COALESCE(SUM(CASE WHEN side='WALA' THEN amount END),0) AS wala
+                    COALESCE(SUM(
+                        CASE WHEN side='MERON'
+                        THEN amount END
+                    ),0) AS meron,
+
+                    COALESCE(SUM(
+                        CASE WHEN side='WALA'
+                        THEN amount END
+                    ),0) AS wala
+
                 FROM bets
                 WHERE game_id = $1
                   AND is_dummy = false
+                  AND is_resolved = false
             `, [gameId]);
 
             const meron = Number(totalsRes.rows[0].meron);
