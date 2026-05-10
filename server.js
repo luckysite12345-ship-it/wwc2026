@@ -1541,6 +1541,13 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
     if (req.session.user.role !== 'declarator') {
       return res.status(403).json({ error: "Unauthorized" });
     }
+    // ==========================
+    // RECEIVE FRONTEND ODDS
+    // ==========================
+    const {
+      meronOdds,
+      walaOdds
+    } = req.body;
 
     // 1. FIND OPEN GAME FIRST
     const gameRes = await pool.query(`
@@ -1552,47 +1559,7 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
     }
 
     const game = gameRes.rows[0];
-    // ==========================
-    // COMPUTE FINAL ODDS
-    // ==========================
-    const totalsRes = await pool.query(`
-      SELECT
-        COALESCE(SUM(CASE WHEN side='MERON' THEN amount END),0) AS meron,
-        COALESCE(SUM(CASE WHEN side='WALA' THEN amount END),0) AS wala
-      FROM bets
-      WHERE game_id = $1
-        AND is_dummy = false
-    `, [game.id]);
-
-    const meron = Number(totalsRes.rows[0].meron);
-    const wala = Number(totalsRes.rows[0].wala);
-
-    const totalPool = meron + wala;
-
-    // ==========================
-    // YOUR ODDS FORMULA
-    // ==========================
-    const TARGET_AVG = 1.83;
-
-    let CUT = 0;
-
-    if (meron > 0 && wala > 0) {
-      CUT = (
-        2 * TARGET_AVG * meron * wala
-      ) / ((meron + wala) ** 2);
-    }
-
-    const MIN_CUT = 0.70;
-
-    CUT = Math.max(MIN_CUT, CUT);
-
-    const meronOdds = meron > 0
-      ? (totalPool / meron) * CUT
-      : 0;
-
-    const walaOdds = wala > 0
-      ? (totalPool / wala) * CUT
-      : 0;
+    
 
     // 2. STOP ENGINE SAFELY (IMPORTANT)
     try {
@@ -1601,7 +1568,9 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
       console.error("Dummy engine stop error:", e);
     }
 
-    // 3. UPDATE SPECIFIC GAME
+    // ==========================
+    // SAVE FROZEN ODDS
+    // ==========================
     const updateRes = await pool.query(`
       UPDATE games
       SET
@@ -1611,16 +1580,16 @@ app.post('/api/close-game', isAuthenticated, async (req, res) => {
       WHERE id = $3
       RETURNING *
     `, [
-      meronOdds.toFixed(4),
-      walaOdds.toFixed(4),
+      Number(meronOdds).toFixed(4),
+      Number(walaOdds).toFixed(4),
       game.id
     ]);
+
 
     await upsertActiveEvent({
       gameId: game.id,
       event_name: "",
       announcement: `Betting Closed`,
-      
     });
     broadcast("GAME_CLOSED", {
       gameId: game.id
@@ -1707,63 +1676,13 @@ app.post('/api/declare-winner', isAuthenticated, async (req, res) => {
         const bets = betsRes.rows;
 
         // ==========================
-        // CALCULATE ODDS
+        // USE SAVED FROZEN ODDS
         // ==========================
-        let payouts = {
-            MERON: 0,
-            WALA: 0
+        const payouts = {
+            MERON: Number(game.meron_odds || 0),
+            WALA: Number(game.wala_odds || 0)
         };
-
-        if (winner !== 'DRAW' && winner !== 'CANCELLED') {
-
-            const totalsRes = await client.query(`
-                SELECT
-                    COALESCE(SUM(
-                        CASE WHEN side='MERON'
-                        THEN amount END
-                    ),0) AS meron,
-
-                    COALESCE(SUM(
-                        CASE WHEN side='WALA'
-                        THEN amount END
-                    ),0) AS wala
-
-                FROM bets
-                WHERE game_id = $1
-                  AND is_dummy = false
-                  AND is_resolved = false
-            `, [gameId]);
-
-            const meron = Number(totalsRes.rows[0].meron);
-            const wala = Number(totalsRes.rows[0].wala);
-
-            const totalPool = meron + wala;
-
-            const TARGET_AVG = 1.83;
-
-            let CUT = 0;
-
-            if (meron > 0 && wala > 0) {
-
-                CUT = (
-                    2 * TARGET_AVG * meron * wala
-                ) / ((meron + wala) ** 2);
-            }
-
-            const MIN_CUT = 0.70;
-
-            CUT = Math.max(MIN_CUT, CUT);
-
-            payouts = {
-                MERON: meron > 0
-                    ? (totalPool / meron) * CUT
-                    : 0,
-
-                WALA: wala > 0
-                    ? (totalPool / wala) * CUT
-                    : 0
-            };
-        }
+        
 
         // ==========================
         // PROCESS ALL BETS

@@ -469,9 +469,28 @@ button:disabled {
     }
 
     async function closeGame(){
+        // ==========================
+        // GET DISPLAYED ODDS
+        // ==========================
+        const meronOdds = Number(
+            document.getElementById('payoutMeron')
+                .textContent
+        );
+
+        const walaOdds = Number(
+            document.getElementById('payoutWala')
+                .textContent
+        );
         const res = await fetch('/api/close-game', {
             method: 'POST',
-            credentials: 'include'
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                meronOdds,
+                walaOdds
+            })
         });
 
         const data = await res.json();
