@@ -774,8 +774,17 @@ body, html {
         document.getElementById('betConfirmModal').style.display = 'flex';
     }
     // ✅ CLOSE BET MODAL
+    let isPlacingBet = false;
     async function confirmBet(){
+        // 🚫 BLOCK DUPLICATE REQUESTS
+        if (isPlacingBet) return;
+
+        isPlacingBet = true;
         try {
+            // optional disable button
+            const btn = document.getElementById('confirmBetBtn');
+            if (btn) btn.disabled = true;
+
             const res = await fetch('/api/place-bet', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -815,6 +824,13 @@ body, html {
         } catch (err) {
             console.error(err);
             showSnackbar(err.message, "error");
+        } finally {
+
+            // unlock after request finishes
+            isPlacingBet = false;
+
+            const btn = document.getElementById('confirmBetBtn');
+            if (btn) btn.disabled = false;
         }
     }
     function closeBetModal(){
