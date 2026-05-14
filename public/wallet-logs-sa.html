@@ -163,7 +163,7 @@
         });
         async function loadWalletLogs() {
             try {
-                const res = await fetch('/api/my-wallet-transactions', {
+                const res = await fetch('/api/all-wallet-transactions', {
                     credentials: 'include'
                 });
 
@@ -179,13 +179,10 @@
 
                 const selectedUser = document.getElementById('userFilter')?.value;
 
-                // ✅ SAFER FILTER (case-insensitive)
                 let filtered = data;
 
                 if (selectedUser) {
-                    filtered = data.filter(tx => 
-                        (tx.username || '').toLowerCase() === selectedUser.toLowerCase()
-                    );
+                    filtered = data.filter(tx => tx.username === selectedUser);
                 }
 
                 if (filtered.length === 0) {
@@ -244,24 +241,29 @@
         }
         async function loadUsers() {
             try {
-                const res = await fetch('/api/my-wallet-transactions', {
+                const res = await fetch('/api/all-wallet-transactions', {
                     credentials: 'include'
                 });
 
                 const data = await res.json();
 
                 const select = document.getElementById('userFilter');
-
-                // ✅ CLEAR first (avoid duplicates)
                 select.innerHTML = `<option value="">All Users</option>`;
 
-                // ✅ GET UNIQUE USERNAMES
-                const uniqueUsers = [...new Set(data.map(tx => tx.username).filter(Boolean))];
+                const seen = new Set();
 
-                uniqueUsers.forEach(username => {
+                data.forEach(tx => {
+                    if (!tx.username) return;
+
+                    const key = tx.username.toLowerCase();
+                    if (seen.has(key)) return;
+
+                    seen.add(key);
+
                     const opt = document.createElement('option');
-                    opt.value = username;
-                    opt.textContent = username;
+                    opt.value = tx.username;
+                    opt.textContent = tx.username;
+
                     select.appendChild(opt);
                 });
 

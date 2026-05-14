@@ -157,5 +157,107 @@ router.get('/dashboard', isSuperAdmin, async (req, res) => {
         });
     }
 });
+// =========================
+// NETWORK API
+// SHOW FULL DOWNLINE TREE
+// =========================
+router.get('/network/:id', isSuperAdmin, async (req, res) => {
 
+    const { id } = req.params;
+
+    try {
+
+        const result = await pool.query(`
+            WITH RECURSIVE network AS (
+
+                -- DIRECT DOWNLINES ONLY (SAFE START)
+                SELECT
+                    u.id,
+                    u.username,
+                    u.role,
+                    u.points,
+                    u.status,
+                    u.parent_id,
+                    1 AS level
+                FROM users u
+                WHERE u.parent_id = $1
+
+                UNION ALL
+
+                -- NEXT LEVELS
+                SELECT
+                    child.id,
+                    child.username,
+                    child.role,
+                    child.points,
+                    child.status,
+                    child.parent_id,
+                    network.level + 1
+                FROM users child
+                INNER JOIN network
+                    ON child.parent_id = network.id
+            )
+
+            SELECT
+                n.id,
+                n.username,
+                n.role,
+                n.points,
+                n.status,
+                n.level,
+                p.username AS parent_username
+            FROM network n
+            LEFT JOIN users p
+                ON n.parent_id = p.id
+
+            ORDER BY n.level ASC, n.username ASC
+        `, [id]);
+
+        console.log("NETWORK RESULT:", result.rows);
+
+        res.json(result.rows);
+
+    } catch (err) {
+
+        console.error("❌ NETWORK ERROR:", err);
+
+        res.status(500).json({
+            error: 'Failed to load network'
+        });
+    }
+   
+});
+ router.get('/users-list', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, username, role
+            FROM users
+            WHERE role != 'declarator'
+            ORDER BY username ASC
+        `);
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to load users' });
+    }
+});
+router.get('/all-wallet-transactions', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT DISTINCT username
+            FROM wallet_transactions
+            UNION
+            SELECT username FROM users
+            WHERE role != 'declarator'
+            ORDER BY username ASC;
+        `);
+
+        res.json(result.rows);
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to load logs' });
+    }
+});
 module.exports = router;

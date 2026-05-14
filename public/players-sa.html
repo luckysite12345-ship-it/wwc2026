@@ -16,7 +16,7 @@
         <a href="superadmin.html">🏠 Dashboard</a>
         <a href="wallet-logs-sa.html">📄 Wallet Logs</a>
         <a href="commission-logs-sa.html">💰 Commission Logs</a>
-        <a href="archives.html">🗂 Game Archives</a>
+        <a href="gamearchives.html">🗂 Game Archives</a>
 
         <div class="category">Downlines</div>
         <a href="agents-sa.html">👥 Agents</a>
@@ -42,6 +42,14 @@
 
                 <!-- FILTER -->
                 <div class="filter-bar">
+                    <!-- SEARCH BOX -->
+                    <input
+                        type="text"
+                        id="searchPlayer"
+                        class="membership-link"
+                        placeholder="🔍 Search username..."
+                        onkeyup="loadPlayers()"
+                    >
                     <!--<select id="statusFilter" class="styled-select" onchange="loadPlayers()">-->
                     <select id="statusFilter" class="membership-link" onchange="loadPlayers()">
                         <option value="">All Status</option>
@@ -228,12 +236,17 @@
 
                 const res = await fetch('/api/players', { credentials: 'include' });
                 let players = await res.json();
-
+                const search = document.getElementById('searchPlayer').value.toLowerCase();
                 const filter = document.getElementById('statusFilter').value;
                 if (filter) {
                     players = players.filter(p => p.status === filter);
                 }
-
+                // username search filter
+                if (search) {
+                    players = players.filter(p =>
+                        p.username.toLowerCase().includes(search)
+                    );
+                }
                 const table = document.getElementById('playersTable');
                 table.innerHTML = '';
 

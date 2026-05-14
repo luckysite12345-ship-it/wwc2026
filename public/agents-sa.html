@@ -16,7 +16,7 @@
         <a href="superadmin.html">🏠 Dashboard</a>
         <a href="wallet-logs-sa.html">📄 Wallet Logs</a>
         <a href="commission-logs-sa.html">💰 Commission Logs</a>
-        <a href="archives.html">🗂 Game Archives</a>
+        <a href="gamearchives.html">🗂 Game Archives</a>
 
         <div class="category">Downlines</div>
         <a href="agents-sa.html">👥 Agents</a>
@@ -39,6 +39,14 @@
             <div class="membership-card">
                 <!-- FILTER -->
                 <div class="filter-bar">
+                     <!-- 🔍 SEARCH BOX -->
+                    <input
+                        type="text"
+                        id="agentSearch"
+                        placeholder="🔍 Search username..."
+                        class="membership-link"
+                        oninput="loadAgents()"
+                    >
                     <select id="roleFilter" onchange="loadAgents()" class="membership-link">
                         
                         <option value="">All Roles</option>
@@ -408,6 +416,7 @@
 
                 const roleFilter = document.getElementById('roleFilter').value;
                 const statusFilter = document.getElementById('statusFilter').value;
+                const search = document.getElementById('agentSearch').value.toLowerCase();
 
                 if (roleFilter) {
                     agents = agents.filter(a => a.role === roleFilter);
@@ -416,7 +425,11 @@
                 if (statusFilter) {
                     agents = agents.filter(a => a.status === statusFilter);
                 }
-
+                if (search) {
+                    agents = agents.filter(a =>
+                        a.username.toLowerCase().includes(search)
+                    );
+                }
                 const table = document.getElementById('agentsTable');
                 table.innerHTML = '';
 
@@ -429,7 +442,14 @@
 
                         <td>
                             <select class="action-dropdown"
-                                onchange="handleAgentAction(this, this.value, ${a.id}, ${a.points || 0}, ${a.commission_earnings || 0})">
+                                onchange='handleAgentAction(
+                                    this,
+                                    this.value,
+                                    ${a.id},
+                                    ${JSON.stringify(a.username)},
+                                    ${a.points || 0},
+                                    ${a.commission_earnings || 0}
+                                )'>
 
                                 <option value="">⚙️ Select Action</option>
                                 <option value="load">➕ Load</option>
@@ -585,7 +605,7 @@
         // =========================
         // Handle dropdown actions
         // =========================
-        function handleAgentAction(selectEl, action, userId, points, commission) {
+        function handleAgentAction(selectEl, action, userId, username,points, commission) {
             if (!action) return;
 
             switch(action) {
@@ -602,7 +622,7 @@
                     break;
 
                 case 'network':
-                    openNetwork(userId);
+                    openNetwork(userId, username);
                     break;
 
                 case 'block':
@@ -613,25 +633,32 @@
             // ✅ SAFE reset
             selectEl.value = "";
         }
-        async function openNetwork(userId) {
+        async function openNetwork(userId, username) {
+
             document.getElementById('networkModal').style.display = 'flex';
+
             const container = document.getElementById('networkContent');
 
-            // 👇 optional title update
-            document.querySelector('#networkModal h3').textContent = `Agent ${userId} Network`;
+            // ✅ SHOW USERNAME
+            document.querySelector('#networkModal h3').textContent =
+                `${username} Network`;
 
             container.innerHTML = 'Loading...';
 
             try {
-                const res = await fetch(`/api/network/${userId}`, {
+
+                const res = await fetch(`/api/superadmin/network/${userId}`, {
                     credentials: 'include'
                 });
 
                 const data = await res.json();
 
                 renderNetwork(data);
+
             } catch (err) {
+
                 console.error(err);
+
                 container.innerHTML = 'Failed to load network';
             }
         }
@@ -660,7 +687,7 @@
             list.forEach(user => {
                 html += `
                     <tr>
-                        <td>${user.username}</td>
+                        <td>${'— '.repeat(user.level - 1)}${user.username}</td>
                         <td>${formatRole(user.role)}</td>
                         <td>${formatPHP(user.points || 0)}</td>
                         <td class="status ${user.status}">
@@ -732,6 +759,20 @@
             } catch (err) {
                 console.error(err);
                 showSnackbar("Logout failed", "error");
+            }
+        }
+        function formatRole(role) {
+            switch (role) {
+                case 'master_agent':
+                    return '🗃️ Incorporator';
+                case 'sub_agent':
+                    return '📑 Master Agent';
+                case 'agent':
+                    return '🏷️ Gold Agent';
+                case 'player':
+                    return '🧑 Player';
+                default:
+                    return role || '-';
             }
         }
         // =========================
