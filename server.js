@@ -210,20 +210,27 @@ const settleGame = async (gameId, winner) => {
         WHERE id = $2
       `, [winAmount, bet.user_id]);
 
+      const description =
+          winner === 'CANCELLED'
+              ? 'REFUND - CANCELLED'
+              : winner === 'DRAW' && bet.side !== 'DRAW'
+                  ? 'REFUND - DRAW'
+                  : `WIN - ${winner}`;
+
       await client.query(`
-        INSERT INTO wallet_transactions
-        (user_id, type, amount, balance_after, description)
-        VALUES (
-          $1,
-          'credit',
-          $2,
-          (SELECT points FROM users WHERE id=$1),
-          $3
-        )
+          INSERT INTO wallet_transactions
+          (user_id, type, amount, balance_after, description)
+          VALUES (
+              $1,
+              'credit',
+              $2,
+              (SELECT points FROM users WHERE id=$1),
+              $3
+          )
       `, [
-        bet.user_id,
-        winAmount,
-        `Win - ${winner}`
+          userId,
+          payout,
+          description
       ]);
     }
 
