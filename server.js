@@ -1763,6 +1763,11 @@ app.post('/api/declare-winner', isAuthenticated, async (req, res) => {
                     bet.user_id
                 ]);
 
+                const description =
+                    resultStatus === 'REFUND'
+                        ? `REFUND - ${winner}`
+                        : `WIN - ${winner}`;
+
                 await client.query(`
                     INSERT INTO wallet_transactions
                     (
@@ -1782,7 +1787,7 @@ app.post('/api/declare-winner', isAuthenticated, async (req, res) => {
                 `, [
                     bet.user_id,
                     payout,
-                    `WIN - ${winner}`
+                    description
                 ]);
             }
 
