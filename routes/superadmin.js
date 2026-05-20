@@ -403,6 +403,7 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
 
             LEFT JOIN bets b
                 ON b.game_id = g.id
+                AND b.is_dummy = false
 
             ${whereClause}
 
