@@ -260,4 +260,177 @@ router.get('/all-wallet-transactions', async (req, res) => {
         res.status(500).json({ error: 'Failed to load logs' });
     }
 });
+// =========================
+// GAME ARCHIVES
+// =========================
+router.get('/game-archives', isSuperAdmin, async (req, res) => {
+
+    try {
+
+        const {
+            search = '',
+            from = '',
+            to = '',
+            limit = 100
+        } = req.query;
+
+        let conditions = [];
+        let values = [];
+        let index = 1;
+
+        // =========================
+        // SEARCH
+        // =========================
+        if (search) {
+            conditions.push(`
+                (
+                    CAST(g.id AS TEXT) ILIKE $${index}
+                    OR g.event_name ILIKE $${index}
+                )
+            `);
+
+            values.push(`%${search}%`);
+            index++;
+        }
+
+        // =========================
+        // FROM DATE
+        // =========================
+        if (from) {
+            conditions.push(`
+                DATE(g.created_at) >= $${index}
+            `);
+
+            values.push(from);
+            index++;
+        }
+
+        // =========================
+        // TO DATE
+        // =========================
+        if (to) {
+            conditions.push(`
+                DATE(g.created_at) <= $${index}
+            `);
+
+            values.push(to);
+            index++;
+        }
+
+        const whereClause =
+            conditions.length > 0
+                ? `WHERE ${conditions.join(' AND ')}`
+                : '';
+
+        // =========================
+        // QUERY
+        // =========================
+        const query = `
+            SELECT
+                g.id,
+                g.fight_number,
+                g.event_name,
+                g.winner,
+
+                g.winning_odds,
+                g.meron_odds,
+                g.wala_odds,
+
+                g.created_at,
+
+                COALESCE(SUM(
+                    CASE WHEN b.side = 'MERON'
+                    THEN b.amount ELSE 0 END
+                ),0) AS meron_total,
+
+                COALESCE(SUM(
+                    CASE WHEN b.side = 'WALA'
+                    THEN b.amount ELSE 0 END
+                ),0) AS wala_total,
+
+                COALESCE(SUM(
+                    CASE WHEN b.side = 'DRAW'
+                    THEN b.amount ELSE 0 END
+                ),0) AS draw_total,
+
+                COALESCE(SUM(b.amount),0) AS total_bets,
+
+                ROUND(
+
+                    (
+                        COALESCE(SUM(b.amount),0) * 0.915
+                    )
+
+                    -
+
+                    CASE
+
+                        WHEN g.winner = 'MERON'
+                        THEN
+                            COALESCE(SUM(
+                                CASE
+                                    WHEN b.side = 'MERON'
+                                    THEN b.amount
+                                    ELSE 0
+                                END
+                            ),0)
+
+                            *
+
+                            COALESCE(g.meron_odds, g.winning_odds, 0)
+
+                        WHEN g.winner = 'WALA'
+                        THEN
+                            COALESCE(SUM(
+                                CASE
+                                    WHEN b.side = 'WALA'
+                                    THEN b.amount
+                                    ELSE 0
+                                END
+                            ),0)
+
+                            *
+
+                            COALESCE(g.wala_odds, g.winning_odds, 0)
+
+                        ELSE 0
+
+                    END
+
+                ,2) AS game_earning
+
+            FROM games g
+
+            LEFT JOIN bets b
+                ON b.game_id = g.id
+
+            ${whereClause}
+
+            GROUP BY
+                g.id,
+                g.event_name,
+                g.winner,
+                g.winning_odds,
+                g.meron_odds,
+                g.wala_odds,
+                g.created_at
+
+            ORDER BY g.id DESC
+
+            LIMIT ${Number(limit)}
+        `;
+
+        const result = await pool.query(query, values);
+
+        res.json(result.rows);
+
+    } catch (err) {
+
+        console.error("GAME ARCHIVES ERROR:", err);
+
+        res.status(500).json({
+            error: 'Failed to load game archives'
+        });
+    }
+});
 module.exports = router;
