@@ -282,6 +282,7 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
         // SEARCH
         // =========================
         if (search) {
+
             conditions.push(`
                 (
                     CAST(g.id AS TEXT) ILIKE $${index}
@@ -297,6 +298,7 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
         // FROM DATE
         // =========================
         if (from) {
+
             conditions.push(`
                 DATE(g.created_at) >= $${index}
             `);
@@ -309,6 +311,7 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
         // TO DATE
         // =========================
         if (to) {
+
             conditions.push(`
                 DATE(g.created_at) <= $${index}
             `);
@@ -338,27 +341,59 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
 
                 g.created_at,
 
-                COALESCE(SUM(
-                    CASE WHEN b.side = 'MERON'
-                    THEN b.amount ELSE 0 END
-                ),0) AS meron_total,
+                -- =========================
+                -- PLAYER BET TOTALS ONLY
+                -- =========================
 
                 COALESCE(SUM(
-                    CASE WHEN b.side = 'WALA'
-                    THEN b.amount ELSE 0 END
-                ),0) AS wala_total,
+                    CASE
+                        WHEN u.role = 'player'
+                        AND b.side = 'MERON'
+                        THEN b.amount
+                        ELSE 0
+                    END
+                ), 0) AS meron_total,
 
                 COALESCE(SUM(
-                    CASE WHEN b.side = 'DRAW'
-                    THEN b.amount ELSE 0 END
-                ),0) AS draw_total,
+                    CASE
+                        WHEN u.role = 'player'
+                        AND b.side = 'WALA'
+                        THEN b.amount
+                        ELSE 0
+                    END
+                ), 0) AS wala_total,
 
-                COALESCE(SUM(b.amount),0) AS total_bets,
+                COALESCE(SUM(
+                    CASE
+                        WHEN u.role = 'player'
+                        AND b.side = 'DRAW'
+                        THEN b.amount
+                        ELSE 0
+                    END
+                ), 0) AS draw_total,
+
+                COALESCE(SUM(
+                    CASE
+                        WHEN u.role = 'player'
+                        THEN b.amount
+                        ELSE 0
+                    END
+                ), 0) AS total_bets,
+
+                -- =========================
+                -- GAME EARNINGS
+                -- =========================
 
                 ROUND(
 
                     (
-                        COALESCE(SUM(b.amount),0) * 0.915
+                        COALESCE(SUM(
+                            CASE
+                                WHEN u.role = 'player'
+                                THEN b.amount
+                                ELSE 0
+                            END
+                        ),0) * 0.915
                     )
 
                     -
@@ -367,9 +402,11 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
 
                         WHEN g.winner = 'MERON'
                         THEN
+
                             COALESCE(SUM(
                                 CASE
-                                    WHEN b.side = 'MERON'
+                                    WHEN u.role = 'player'
+                                    AND b.side = 'MERON'
                                     THEN b.amount
                                     ELSE 0
                                 END
@@ -377,13 +414,19 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
 
                             *
 
-                            COALESCE(g.meron_odds, g.winning_odds, 0)
+                            COALESCE(
+                                g.meron_odds,
+                                g.winning_odds,
+                                0
+                            )
 
                         WHEN g.winner = 'WALA'
                         THEN
+
                             COALESCE(SUM(
                                 CASE
-                                    WHEN b.side = 'WALA'
+                                    WHEN u.role = 'player'
+                                    AND b.side = 'WALA'
                                     THEN b.amount
                                     ELSE 0
                                 END
@@ -391,7 +434,11 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
 
                             *
 
-                            COALESCE(g.wala_odds, g.winning_odds, 0)
+                            COALESCE(
+                                g.wala_odds,
+                                g.winning_odds,
+                                0
+                            )
 
                         ELSE 0
 
@@ -405,10 +452,14 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                 ON b.game_id = g.id
                 AND b.is_dummy = false
 
+            LEFT JOIN users u
+                ON u.id = b.user_id
+
             ${whereClause}
 
             GROUP BY
                 g.id,
+                g.fight_number,
                 g.event_name,
                 g.winner,
                 g.winning_odds,
