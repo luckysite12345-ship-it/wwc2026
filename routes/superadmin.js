@@ -271,8 +271,39 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
             search = '',
             from = '',
             to = '',
-            limit = 100
+            limit = 25,
+            page = 1,
+            sort = 'id',
+            order = 'DESC'
         } = req.query;
+
+        const safeLimit =
+            [25, 50, 100].includes(Number(limit))
+                ? Number(limit)
+                : 25;
+
+        const offset =
+            (Number(page) - 1) * safeLimit;
+
+        const allowedSorts = [
+            'id',
+            'fight_number',
+            'event_name',
+            'winner',
+            'created_at',
+            'game_earning',
+            'meron_total',
+            'wala_total',
+            'draw_total'
+        ];
+
+        const safeSort =
+            allowedSorts.includes(sort)
+                ? sort
+                : 'id';
+
+        const safeOrder =
+            order === 'ASC' ? 'ASC' : 'DESC';
 
         let conditions = [];
         let values = [];
@@ -286,6 +317,7 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
             conditions.push(`
                 (
                     CAST(g.id AS TEXT) ILIKE $${index}
+                    OR CAST(g.fight_number AS TEXT) ILIKE $${index}
                     OR g.event_name ILIKE $${index}
                 )
             `);
@@ -326,9 +358,25 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                 : '';
 
         // =========================
-        // QUERY
+        // TOTAL RECORDS
+        // =========================
+        const countQuery = `
+            SELECT COUNT(*) AS total
+            FROM games g
+            ${whereClause}
+        `;
+
+        const countResult =
+            await pool.query(countQuery, values);
+
+        const total =
+            Number(countResult.rows[0].total);
+
+        // =========================
+        // MAIN QUERY
         // =========================
         const query = `
+
             SELECT
                 g.id,
                 g.fight_number,
@@ -340,10 +388,6 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                 g.wala_odds,
 
                 g.created_at,
-
-                -- =========================
-                -- PLAYER BET TOTALS ONLY
-                -- =========================
 
                 COALESCE(SUM(
                     CASE
@@ -371,18 +415,6 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                         ELSE 0
                     END
                 ), 0) AS draw_total,
-
-                COALESCE(SUM(
-                    CASE
-                        WHEN u.role = 'player'
-                        THEN b.amount
-                        ELSE 0
-                    END
-                ), 0) AS total_bets,
-
-                -- =========================
-                -- GAME EARNINGS
-                -- =========================
 
                 ROUND(
 
@@ -467,18 +499,26 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                 g.wala_odds,
                 g.created_at
 
-            ORDER BY g.id DESC
+            ORDER BY ${safeSort} ${safeOrder}
 
-            LIMIT ${Number(limit)}
+            LIMIT ${safeLimit}
+            OFFSET ${offset}
         `;
 
-        const result = await pool.query(query, values);
+        const result =
+            await pool.query(query, values);
 
-        res.json(result.rows);
+        res.json({
+            rows: result.rows,
+            total
+        });
 
     } catch (err) {
 
-        console.error("GAME ARCHIVES ERROR:", err);
+        console.error(
+            "GAME ARCHIVES ERROR:",
+            err
+        );
 
         res.status(500).json({
             error: 'Failed to load game archives'

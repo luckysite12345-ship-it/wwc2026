@@ -40,28 +40,85 @@
             <div id="snackbar"></div>
             <h2>Fight Logs</h2>
             <div class="filters">
-                <input type="text" id="search" placeholder="Search username / fight #">
+
+                <input
+                    type="text"
+                    id="search"
+                    placeholder="Search event / fight #"
+                >
+
                 <input type="date" id="from">
                 <input type="date" id="to">
-                <button onclick="loadGameArchives()">Search</button>
+
+                <select id="limit">
+                    <option value="25">25 Rows</option>
+                    <option value="50">50 Rows</option>
+                    <option value="100">100 Rows</option>
+                </select>
+
+                <button onclick="loadGameArchives(1)">
+                    Search
+                </button>
+
+            </div>
+
+            <div style="margin-bottom:10px;">
+                Total Records:
+                <span id="totalRecords">0</span>
             </div>
             <div class="table-wrapper">
                 <table class="styled-table" id="walletTable">
                     <thead>
                         <tr>
-                            <th>Fight #</th>
-                            <th>Event</th>
-                            <th>MERON</th>
-                            <th>WALA</th>
-                            <th>DRAW</th>
-                            <th>Total Bets</th>
-                            <th>Winner</th>
-                            <th>Winning Odds</th>
-                            <th>Earnings</th>
-                            <th>Date</th>
+
+                            <th onclick="sortTable('fight_number')">
+                                Fight #
+                            </th>
+
+                            <th onclick="sortTable('event_name')">
+                                Event
+                            </th>
+
+                            <th onclick="sortTable('meron_total')">
+                                MERON
+                            </th>
+
+                            <th onclick="sortTable('wala_total')">
+                                WALA
+                            </th>
+
+                            <th onclick="sortTable('draw_total')">
+                                DRAW
+                            </th>
+
+                            <th onclick="sortTable('winner')">
+                                Winner
+                            </th>
+
+                            <th onclick="sortTable('game_earning')">
+                                Earnings
+                            </th>
+
+                            <th onclick="sortTable('created_at')">
+                                Date
+                            </th>
+
+                            <th>
+                                Action
+                            </th>
+
                         </tr>
-                    </thead>
+                        </thead>
                     <tbody></tbody>
+                    <div
+                        id="pagination"
+                        style="
+                            margin-top:15px;
+                            display:flex;
+                            gap:5px;
+                            flex-wrap:wrap;
+                        "
+                    ></div>
                 </table>
             </div>
         </div>
@@ -165,40 +222,74 @@
         });
 
         
-        async function loadGameArchives() {
+        let currentPage = 1;
+        let currentSort = 'id';
+        let currentOrder = 'DESC';
+
+        async function loadGameArchives(page = 1) {
+
             try {
-                const search = document.getElementById('search')?.value || '';
-                const from = document.getElementById('from')?.value || '';
-                const to = document.getElementById('to')?.value || '';
+
+                currentPage = page;
+
+                const search =
+                    document.getElementById('search').value;
+
+                const from =
+                    document.getElementById('from').value;
+
+                const to =
+                    document.getElementById('to').value;
+
+                const limit =
+                    document.getElementById('limit').value;
 
                 const params = new URLSearchParams({
                     search,
                     from,
                     to,
-                    limit: 100
+                    limit,
+                    page,
+                    sort: currentSort,
+                    order: currentOrder
                 });
 
-                const res = await fetch(`/api/superadmin/game-archives?${params}`, {
-                    credentials: 'include'
-                });
+                const res = await fetch(
+                    `/api/superadmin/game-archives?${params}`,
+                    {
+                        credentials: 'include'
+                    }
+                );
 
-                if (res.status === 401) {
-                    window.location.href = '/';
-                    return;
-                }
+                const response = await res.json();
 
-                const data = await res.json();
-                const tbody = document.querySelector('#walletTable tbody');
+                const data = response.rows || [];
+
+                document.getElementById(
+                    'totalRecords'
+                ).textContent = response.total || 0;
+
+                const tbody =
+                    document.querySelector(
+                        '#walletTable tbody'
+                    );
+
                 tbody.innerHTML = '';
 
                 data.forEach(game => {
 
-                    const row = document.createElement('tr');
+                    const row =
+                        document.createElement('tr');
 
                     row.innerHTML = `
-                        <td>Fight #${game.fight_number || game.id}</td>
 
-                        <td>${game.event_name || '-'}</td>
+                        <td>
+                            Fight #${game.fight_number || game.id}
+                        </td>
+
+                        <td>
+                            ${game.event_name || '-'}
+                        </td>
 
                         <td>
                             ${Number(game.meron_total || 0).toFixed(2)}
@@ -213,37 +304,135 @@
                         </td>
 
                         <td>
-                            ${Number(game.total_bets || 0).toFixed(2)}
-                        </td>
-
-                        <td>
                             ${game.winner || '-'}
                         </td>
-                        <td>
-                            ${
-                                game.winner === 'MERON'
-                                    ? Number(game.meron_odds || game.winning_odds || 0).toFixed(2)
 
-                                    : game.winner === 'WALA'
-                                    ? Number(game.wala_odds || game.winning_odds || 0).toFixed(2)
-
-                                    : Number(game.winning_odds || 0).toFixed(2)
-                            }
-                        </td>
                         <td>
                             ${Number(game.game_earning || 0).toFixed(2)}
                         </td>
 
                         <td>
-                            ${new Date(game.created_at).toLocaleString()}
+                            ${new Date(game.created_at)
+                                .toLocaleString()}
+                        </td>
+
+                        <td>
+
+                            <button
+                                onclick="changeWinner(${game.id})"
+                            >
+                                Change Winner
+                            </button>
+
                         </td>
                     `;
 
                     tbody.appendChild(row);
                 });
 
+                renderPagination(
+                    response.total,
+                    Number(limit)
+                );
+
             } catch (err) {
+
                 console.error(err);
+            }
+        }
+        function sortTable(column) {
+
+            if (currentSort === column) {
+
+                currentOrder =
+                    currentOrder === 'ASC'
+                        ? 'DESC'
+                        : 'ASC';
+
+            } else {
+
+                currentSort = column;
+                currentOrder = 'ASC';
+            }
+
+            loadGameArchives(1);
+        }
+
+        function renderPagination(total, limit) {
+
+            const pagination =
+                document.getElementById('pagination');
+
+            pagination.innerHTML = '';
+
+            const totalPages =
+                Math.ceil(total / limit);
+
+            for (let i = 1; i <= totalPages; i++) {
+
+                const btn =
+                    document.createElement('button');
+
+                btn.textContent = i;
+
+                if (i === currentPage) {
+                    btn.disabled = true;
+                }
+
+                btn.onclick = () =>
+                    loadGameArchives(i);
+
+                pagination.appendChild(btn);
+            }
+        }
+
+        async function changeWinner(gameId) {
+
+            const winner = prompt(
+                'Enter MERON, WALA, or DRAW'
+            );
+
+            if (!winner) return;
+
+            try {
+
+                const res = await fetch(
+                    '/api/superadmin/change-winner',
+                    {
+                        method: 'POST',
+
+                        headers: {
+                            'Content-Type':
+                                'application/json'
+                        },
+
+                        credentials: 'include',
+
+                        body: JSON.stringify({
+                            gameId,
+                            winner: winner.toUpperCase()
+                        })
+                    }
+                );
+
+                const data = await res.json();
+
+                if (!res.ok) {
+
+                    alert(data.error || 'Failed');
+
+                    return;
+                }
+
+                alert('Winner updated');
+
+                loadGameArchives(currentPage);
+
+            } catch (err) {
+
+                console.error(err);
+
+                alert('Server error');
             }
         }
         //Code for logout
