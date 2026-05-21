@@ -5,29 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Game Archives</title>
     <link rel="stylesheet" href="style.css">
-    <style> .pagination {
+    <style> 
+        .pagination {
+
             margin-top: 15px;
+
             display: flex;
-            gap: 6px;
+
             flex-wrap: wrap;
+
+            gap: 8px;
+
             align-items: center;
         }
 
-        .pagination button {
+        .pagination-btn {
 
             width: auto !important;
-            min-width: 40px;
 
-            padding: 6px 12px;
+            min-width: 40px !important;
+
+            padding: 6px 12px !important;
 
             border: none;
+
             border-radius: 6px;
 
             cursor: pointer;
+
+            display: inline-block !important;
+
+            flex: unset !important;
         }
 
-        .pagination button:disabled {
+        .pagination-btn:disabled {
+
             opacity: 0.5;
+
             cursor: default;
         }
     </style>
@@ -395,22 +409,85 @@
             const totalPages =
                 Math.ceil(total / limit);
 
-            for (let i = 1; i <= totalPages; i++) {
+            if (totalPages <= 1) return;
+
+            // =========================
+            // BUTTON CREATOR
+            // =========================
+            function createButton(label, page, disabled = false) {
 
                 const btn =
                     document.createElement('button');
 
-                btn.textContent = i;
+                btn.textContent = label;
 
-                if (i === currentPage) {
-                    btn.disabled = true;
-                }
+                btn.disabled = disabled;
 
-                btn.onclick = () =>
-                    loadGameArchives(i);
+                btn.className = 'pagination-btn';
+
+                btn.onclick = () => {
+
+                    if (!disabled) {
+                        loadGameArchives(page);
+                    }
+                };
 
                 pagination.appendChild(btn);
             }
+
+            // =========================
+            // FIRST
+            // =========================
+            createButton(
+                'First',
+                1,
+                currentPage === 1
+            );
+
+            // =========================
+            // PREVIOUS
+            // =========================
+            createButton(
+                'Prev',
+                currentPage - 1,
+                currentPage === 1
+            );
+
+            // =========================
+            // PAGE RANGE
+            // =========================
+            let start =
+                Math.max(1, currentPage - 2);
+
+            let end =
+                Math.min(totalPages, currentPage + 2);
+
+            for (let i = start; i <= end; i++) {
+
+                createButton(
+                    i,
+                    i,
+                    i === currentPage
+                );
+            }
+
+            // =========================
+            // NEXT
+            // =========================
+            createButton(
+                'Next',
+                currentPage + 1,
+                currentPage === totalPages
+            );
+
+            // =========================
+            // LAST
+            // =========================
+            createButton(
+                'Last',
+                totalPages,
+                currentPage === totalPages
+            );
         }
 
         async function changeWinner(gameId) {
