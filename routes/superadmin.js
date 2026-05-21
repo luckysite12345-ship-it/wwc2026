@@ -292,6 +292,7 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
             'winner',
             'created_at',
             'game_earning',
+            'agent_commission_total',
             'meron_total',
             'wala_total',
             'draw_total'
@@ -416,6 +417,14 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                     END
                 ), 0) AS draw_total,
 
+                COALESCE(
+                    (
+                        SELECT SUM(ct.amount)
+                        FROM commission_transactions ct
+                        WHERE ct.game_id = g.id
+                    ),
+                0) AS agent_commission_total,
+
                 ROUND(
 
                     (
@@ -475,6 +484,16 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                         ELSE 0
 
                     END
+
+                    -
+
+                    COALESCE(
+                        (
+                            SELECT SUM(ct.amount)
+                            FROM commission_transactions ct
+                            WHERE ct.game_id = g.id
+                        ),
+                    0)
 
                 ,2) AS game_earning
 

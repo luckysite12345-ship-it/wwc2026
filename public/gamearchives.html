@@ -134,7 +134,9 @@
                             <th onclick="sortTable('winner')">
                                 Winner
                             </th>
-
+                            <th onclick="sortTable('agent_commission_total')">
+                                Agent Commission
+                            </th>
                             <th onclick="sortTable('game_earning')">
                                 Earnings
                             </th>
@@ -347,7 +349,11 @@
                         <td>
                             ${game.winner || '-'}
                         </td>
-
+                        
+                        <td>
+                            ${Number(game.agent_commission_total || 0).toFixed(2)}
+                        </td>
+                        
                         <td>
                             ${Number(game.game_earning || 0).toFixed(2)}
                         </td>
