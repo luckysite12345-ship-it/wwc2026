@@ -873,28 +873,3 @@ button:disabled {
     color: #f87171; /* slight red tone */
 }
 
-.pagination {
-            margin-top: 15px;
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        .pagination button {
-
-            width: auto !important;
-            min-width: 40px;
-
-            padding: 6px 12px;
-
-            border: none;
-            border-radius: 6px;
-
-            cursor: pointer;
-        }
-
-        .pagination button:disabled {
-            opacity: 0.5;
-            cursor: default;
-        }
