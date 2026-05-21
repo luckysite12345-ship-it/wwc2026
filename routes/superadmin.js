@@ -666,4 +666,333 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
         });
     }
 });
+// =========================
+// COMMISSION LOGS
+// =========================
+router.get(
+    '/commission-transactions',
+    isSuperAdmin,
+    async (req, res) => {
+
+    try {
+
+        const {
+            search = '',
+            from = '',
+            to = '',
+            limit = 25,
+            page = 1,
+            sort = 'created_at',
+            order = 'DESC'
+        } = req.query;
+
+        // =========================
+        // SAFE LIMIT
+        // =========================
+        const safeLimit =
+            [25, 50, 100].includes(Number(limit))
+                ? Number(limit)
+                : 25;
+
+        const offset =
+            (Number(page) - 1) * safeLimit;
+
+        // =========================
+        // SAFE SORT
+        // =========================
+        const allowedSorts = [
+            'created_at',
+            'source_username',
+            'receiver_username',
+            'base_amount',
+            'rate',
+            'amount',
+            'level',
+            'fight_number'
+        ];
+
+        const safeSort =
+            allowedSorts.includes(sort)
+                ? sort
+                : 'created_at';
+
+        const safeOrder =
+            order === 'ASC'
+                ? 'ASC'
+                : 'DESC';
+
+        // =========================
+        // FILTERS
+        // =========================
+        let conditions = [];
+        let values = [];
+        let index = 1;
+
+        // =========================
+        // SEARCH
+        // =========================
+        if (search) {
+
+            conditions.push(`
+
+                (
+
+                    source_user.username
+                        ILIKE $${index}
+
+                    OR
+
+                    receiver_user.username
+                        ILIKE $${index}
+
+                    OR
+
+                    CAST(g.fight_number AS TEXT)
+                        ILIKE $${index}
+
+                    OR
+
+                    CAST(ct.game_id AS TEXT)
+                        ILIKE $${index}
+
+                )
+
+            `);
+
+            values.push(`%${search}%`);
+
+            index++;
+
+        }
+
+        // =========================
+        // FROM DATE
+        // =========================
+        if (from) {
+
+            conditions.push(`
+                DATE(ct.created_at) >= $${index}
+            `);
+
+            values.push(from);
+
+            index++;
+
+        }
+
+        // =========================
+        // TO DATE
+        // =========================
+        if (to) {
+
+            conditions.push(`
+                DATE(ct.created_at) <= $${index}
+            `);
+
+            values.push(to);
+
+            index++;
+
+        }
+
+        const whereClause =
+            conditions.length > 0
+                ? `WHERE ${conditions.join(' AND ')}`
+                : '';
+
+        // =========================
+        // TOTAL RECORDS
+        // =========================
+        const countQuery = `
+
+            SELECT COUNT(*) AS total
+
+            FROM commission_transactions ct
+
+            LEFT JOIN users source_user
+                ON source_user.id =
+                    ct.source_user_id
+
+            LEFT JOIN users receiver_user
+                ON receiver_user.id =
+                    ct.user_id
+
+            LEFT JOIN games g
+                ON g.id = ct.game_id
+
+            ${whereClause}
+
+        `;
+
+        const countResult =
+            await pool.query(
+                countQuery,
+                values
+            );
+
+        const total =
+            Number(
+                countResult.rows[0].total
+            );
+
+        // =========================
+        // TOTAL COMMISSION
+        // =========================
+        const totalCommissionQuery = `
+
+            SELECT
+
+                COALESCE(
+                    SUM(ct.amount),
+                0) AS total_commission
+
+            FROM commission_transactions ct
+
+            LEFT JOIN users source_user
+                ON source_user.id =
+                    ct.source_user_id
+
+            LEFT JOIN users receiver_user
+                ON receiver_user.id =
+                    ct.user_id
+
+            LEFT JOIN games g
+                ON g.id = ct.game_id
+
+            ${whereClause}
+
+        `;
+
+        const totalCommissionResult =
+            await pool.query(
+                totalCommissionQuery,
+                values
+            );
+
+        const totalCommission =
+            Number(
+                totalCommissionResult
+                    .rows[0]
+                    .total_commission || 0
+            );
+
+        // =========================
+        // SORT COLUMN MAP
+        // =========================
+        const sortMap = {
+
+            created_at:
+                'ct.created_at',
+
+            source_username:
+                'source_user.username',
+
+            receiver_username:
+                'receiver_user.username',
+
+            base_amount:
+                'ct.base_amount',
+
+            rate:
+                'ct.rate',
+
+            amount:
+                'ct.amount',
+
+            level:
+                'ct.level',
+
+            fight_number:
+                'g.fight_number'
+
+        };
+
+        // =========================
+        // MAIN QUERY
+        // =========================
+        const query = `
+
+            SELECT
+
+                ct.id,
+                ct.created_at,
+                ct.base_amount,
+                ct.rate,
+                ct.amount,
+                ct.level,
+
+                ct.game_id,
+
+                source_user.username
+                    AS source_username,
+
+                receiver_user.username
+                    AS receiver_username,
+
+                g.fight_number
+
+            FROM commission_transactions ct
+
+            LEFT JOIN users source_user
+                ON source_user.id =
+                    ct.source_user_id
+
+            LEFT JOIN users receiver_user
+                ON receiver_user.id =
+                    ct.user_id
+
+            LEFT JOIN games g
+                ON g.id = ct.game_id
+
+            ${whereClause}
+
+            ORDER BY
+                ${sortMap[safeSort]}
+                ${safeOrder}
+
+            LIMIT ${safeLimit}
+            OFFSET ${offset}
+
+        `;
+
+        const result =
+            await pool.query(
+                query,
+                values
+            );
+
+        res.json({
+
+            rows:
+                result.rows,
+
+            total,
+
+            totalCommission,
+
+            currentPage:
+                Number(page),
+
+            totalPages:
+                Math.ceil(
+                    total / safeLimit
+                )
+
+        });
+
+    } catch (err) {
+
+        console.error(
+            'COMMISSION LOGS ERROR:',
+            err
+        );
+
+        res.status(500).json({
+            error:
+                'Failed to load commission logs'
+        });
+
+    }
+
+});
 module.exports = router;

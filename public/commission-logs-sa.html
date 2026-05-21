@@ -40,26 +40,89 @@
             <div id="snackbar"></div>
             <h2>Commission Logs</h2>
             <div class="filters">
-                <input type="text" id="search" placeholder="Search username / fight #">
+
+                <input
+                    type="text"
+                    id="search"
+                    placeholder="Search receiver / source / fight #"
+                >
+
                 <input type="date" id="from">
+
                 <input type="date" id="to">
-                <button onclick="loadCommissionLogs()">Search</button>
+
+                <select id="limitSelect" onchange="changeLimit()">
+                    <option value="25">25 Rows</option>
+                    <option value="50">50 Rows</option>
+                    <option value="100">100 Rows</option>
+                </select>
+
+                <button onclick="searchLogs()">
+                    Search
+                </button>
+
+            </div>
+
+            <div
+                style="
+                    margin:10px 0;
+                    font-weight:bold;
+                "
+            >
+                Total Commission:
+                ₱<span id="totalCommission">0.00</span>
             </div>
             <div class="table-wrapper">
                 <table class="styled-table" id="walletTable">
                     <thead>
-                         <tr>
-                            <th>Date</th>
-                            <th>Source User</th>
-                            <th>Bet Amount</th>
-                            <th>Rate (%)</th>
-                            <th>Commission Amount</th>
-                            <th>Level</th>
-                            <th>Game (Fight #)</th>
+                        <tr>
+
+                            <th onclick="sortTable('created_at')">
+                                Date
+                            </th>
+
+                            <th onclick="sortTable('receiver_username')">
+                                Receiver
+                            </th>
+
+                            <th onclick="sortTable('source_username')">
+                                Source User
+                            </th>
+
+                            <th onclick="sortTable('base_amount')">
+                                Bet Amount
+                            </th>
+
+                            <th onclick="sortTable('rate')">
+                                Rate (%)
+                            </th>
+
+                            <th onclick="sortTable('amount')">
+                                Commission
+                            </th>
+
+                            <th onclick="sortTable('level')">
+                                Level
+                            </th>
+
+                            <th onclick="sortTable('fight_number')">
+                                Fight #
+                            </th>
+
                         </tr>
-                    </thead>
+                        </thead>
                     <tbody></tbody>
                 </table>
+                <div
+                    id="pagination"
+                    style="
+                        margin-top:15px;
+                        display:flex;
+                        flex-wrap:wrap;
+                        gap:5px;
+                        align-items:center;
+                    "
+                ></div>
             </div>
         </div>
 
@@ -77,7 +140,11 @@
             websiteName: "Website",
             websiteUrl: window.location.origin
         };
+        let currentPage = 1;
+        let currentLimit = 25;
 
+        let currentSort = 'created_at';
+        let currentOrder = 'DESC';
         // =========================
         // Load Config
         // =========================
@@ -113,7 +180,7 @@
                 }
 
                 const data = await res.json();
-                if (data.role !== 'admin') {
+                if (data.role !== '-1') {
                     const summaryLink = document.getElementById('summaryLink');
                     if (summaryLink) summaryLink.style.display = 'none';
                 }
@@ -163,50 +230,296 @@
 
         
         async function loadCommissionLogs() {
+
             try {
-                const search = document.getElementById('search')?.value || '';
-                const from = document.getElementById('from')?.value || '';
-                const to = document.getElementById('to')?.value || '';
+
+                const search =
+                    document.getElementById('search')?.value || '';
+
+                const from =
+                    document.getElementById('from')?.value || '';
+
+                const to =
+                    document.getElementById('to')?.value || '';
 
                 const params = new URLSearchParams({
+
                     search,
                     from,
                     to,
-                    limit: 100
+
+                    page: currentPage,
+
+                    limit: currentLimit,
+
+                    sort: currentSort,
+
+                    order: currentOrder
+
                 });
 
-                const res = await fetch(`/api/my-commission-transactions?${params}`, {
-                    credentials: 'include'
-                });
+                const res = await fetch(
+
+                    `/api/superadmin/commission-transactions?${params}`,
+
+                    {
+                        credentials: 'include'
+                    }
+
+                );
 
                 if (res.status === 401) {
+
                     window.location.href = '/';
+
                     return;
+
                 }
 
                 const data = await res.json();
-                const tbody = document.querySelector('#walletTable tbody');
+
+                const tbody =
+                    document.querySelector(
+                        '#walletTable tbody'
+                    );
+
                 tbody.innerHTML = '';
 
-                data.forEach(tx => {
-                    const row = document.createElement('tr');
+                data.rows.forEach(tx => {
+
+                    const row =
+                        document.createElement('tr');
 
                     row.innerHTML = `
-                        <td>${new Date(tx.created_at).toLocaleString()}</td>
-                        <td>${tx.source_username || '-'}</td>
-                        <td>${Number(tx.base_amount || 0).toFixed(2)}</td>
-                        <td>${Number(tx.rate || 0).toFixed(2)}%</td>
-                        <td>${Number(tx.amount || 0).toFixed(2)}</td>
-                        <td>Level ${tx.level ?? '-'}</td>
-                        <td>Fight #${tx.game_fight ?? '-'}</td>
+
+                        <td>
+                            ${new Date(
+                                tx.created_at
+                            ).toLocaleString()}
+                        </td>
+
+                        <td>
+                            ${tx.receiver_username || '-'}
+                        </td>
+
+                        <td>
+                            ${tx.source_username || '-'}
+                        </td>
+
+                        <td>
+                            ${Number(
+                                tx.base_amount || 0
+                            ).toFixed(2)}
+                        </td>
+
+                        <td>
+                            ${Number(
+                                tx.rate || 0
+                            ).toFixed(2)}%
+                        </td>
+
+                        <td>
+                            ${Number(
+                                tx.amount || 0
+                            ).toFixed(2)}
+                        </td>
+
+                        <td>
+                            Level ${tx.level ?? '-'}
+                        </td>
+
+                        <td>
+                            Fight #${tx.fight_number ?? '-'}
+                        </td>
+
                     `;
 
                     tbody.appendChild(row);
+
                 });
 
+                document.getElementById(
+                    'totalCommission'
+                ).textContent =
+
+                    Number(
+                        data.totalCommission || 0
+                    ).toFixed(2);
+
+                renderPagination(
+
+                    data.currentPage,
+                    data.totalPages,
+                    data.total
+
+                );
+
             } catch (err) {
+
                 console.error(err);
+
             }
+
+        }
+        function searchLogs() {
+
+            currentPage = 1;
+
+            loadCommissionLogs();
+
+        }
+
+        function changeLimit() {
+
+            currentLimit = Number(
+                document.getElementById(
+                    'limitSelect'
+                ).value
+            );
+
+            currentPage = 1;
+
+            loadCommissionLogs();
+
+        }
+
+        function goPage(page) {
+
+            if (page < 1) return;
+
+            currentPage = page;
+
+            loadCommissionLogs();
+
+        }
+
+        function sortTable(column) {
+
+            if (currentSort === column) {
+
+                currentOrder =
+                    currentOrder === 'ASC'
+                    ? 'DESC'
+                    : 'ASC';
+
+            } else {
+
+                currentSort = column;
+
+                currentOrder = 'ASC';
+
+            }
+
+            loadCommissionLogs();
+
+        }
+
+        function renderPagination(
+            currentPage,
+            totalPages,
+            totalRows
+        ) {
+
+            const container =
+                document.getElementById(
+                    'pagination'
+                );
+
+            let html = '';
+
+            html += `
+                <button
+                    onclick="goPage(1)"
+                    ${currentPage === 1 ? 'disabled' : ''}
+                >
+                    Start
+                </button>
+            `;
+
+            html += `
+                <button
+                    onclick="goPage(${currentPage - 1})"
+                    ${currentPage === 1 ? 'disabled' : ''}
+                >
+                    Prev
+                </button>
+            `;
+
+            for (
+
+                let i = Math.max(1, currentPage - 2);
+
+                i <= Math.min(
+                    totalPages,
+                    currentPage + 2
+                );
+
+                i++
+
+            ) {
+
+                html += `
+                    <button
+                        onclick="goPage(${i})"
+
+                        style="
+                            ${
+                                i === currentPage
+                                ? 'font-weight:bold;'
+                                : ''
+                            }
+                        "
+                    >
+                        ${i}
+                    </button>
+                `;
+
+            }
+
+            html += `
+                <button
+                    onclick="goPage(${currentPage + 1})"
+                    ${currentPage === totalPages ? 'disabled' : ''}
+                >
+                    Next
+                </button>
+            `;
+
+            html += `
+                <button
+                    onclick="goPage(${totalPages})"
+                    ${currentPage === totalPages ? 'disabled' : ''}
+                >
+                    End
+                </button>
+            `;
+
+            const start =
+                ((currentPage - 1) * currentLimit) + 1;
+
+            const end =
+                Math.min(
+                    currentPage * currentLimit,
+                    totalRows
+                );
+
+            html += `
+
+                <span
+                    style="
+                        margin-left:10px;
+                        font-weight:bold;
+                    "
+                >
+                    Showing
+                    ${start}-${end}
+                    of ${totalRows}
+                </span>
+
+            `;
+
+            container.innerHTML = html;
+
         }
         //Code for logout
         async function logout() {
