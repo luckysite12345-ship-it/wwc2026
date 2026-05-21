@@ -372,7 +372,128 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
 
         const total =
             Number(countResult.rows[0].total);
+        
+            // =========================
+        // TOTAL EARNINGS
+        // =========================
+        const earningsQuery = `
 
+            SELECT
+
+                COALESCE(SUM(
+
+                    ROUND(
+
+                        (
+                            COALESCE(player_totals.total_bets, 0) * 0.915
+                        )
+
+                        -
+
+                        CASE
+
+                            WHEN g.winner = 'MERON'
+                            THEN
+                                COALESCE(player_totals.meron_total, 0)
+                                *
+                                COALESCE(
+                                    g.meron_odds,
+                                    g.winning_odds,
+                                    0
+                                )
+
+                            WHEN g.winner = 'WALA'
+                            THEN
+                                COALESCE(player_totals.wala_total, 0)
+                                *
+                                COALESCE(
+                                    g.wala_odds,
+                                    g.winning_odds,
+                                    0
+                                )
+
+                            ELSE 0
+
+                        END
+
+                        -
+
+                        COALESCE(commissions.total_commission, 0)
+
+                    ,2)
+
+                ),0) AS total_earnings
+
+            FROM games g
+
+            LEFT JOIN (
+
+                SELECT
+                    b.game_id,
+
+                    SUM(
+                        CASE
+                            WHEN u.role = 'player'
+                            THEN b.amount
+                            ELSE 0
+                        END
+                    ) AS total_bets,
+
+                    SUM(
+                        CASE
+                            WHEN u.role = 'player'
+                            AND b.side = 'MERON'
+                            THEN b.amount
+                            ELSE 0
+                        END
+                    ) AS meron_total,
+
+                    SUM(
+                        CASE
+                            WHEN u.role = 'player'
+                            AND b.side = 'WALA'
+                            THEN b.amount
+                            ELSE 0
+                        END
+                    ) AS wala_total
+
+                FROM bets b
+
+                LEFT JOIN users u
+                    ON u.id = b.user_id
+
+                WHERE b.is_dummy = false
+
+                GROUP BY b.game_id
+
+            ) player_totals
+                ON player_totals.game_id = g.id
+
+            LEFT JOIN (
+
+                SELECT
+                    game_id,
+                    SUM(amount) AS total_commission
+                FROM commission_transactions
+                GROUP BY game_id
+
+            ) commissions
+                ON commissions.game_id = g.id
+
+            ${whereClause}
+        `;
+
+        const earningsResult =
+            await pool.query(
+                earningsQuery,
+                values
+            );
+
+        const totalEarnings =
+            Number(
+                earningsResult.rows[0]
+                    .total_earnings || 0
+            );
         // =========================
         // MAIN QUERY
         // =========================
@@ -529,7 +650,8 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
 
         res.json({
             rows: result.rows,
-            total
+            total,
+            totalEarnings
         });
 
     } catch (err) {

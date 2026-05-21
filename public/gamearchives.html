@@ -102,9 +102,30 @@
 
             </div>
 
-            <div style="margin-bottom:10px;">
-                Total Records:
-                <span id="totalRecords">0</span>
+            <div
+                style="
+                    margin-bottom:10px;
+                    display:flex;
+                    gap:20px;
+                    flex-wrap:wrap;
+                    align-items:center;
+                "
+            >
+                <div>
+                    Total Records:
+                    <span id="totalRecords">0</span>
+                </div>
+
+                <div
+                    style="
+                        font-weight:bold;
+                        color:#16a34a;
+                        font-size:18px;
+                    "
+                >
+                    Total Earnings:
+                    ₱<span id="totalEarnings">0.00</span>
+                </div>
             </div>
             <div class="table-wrapper">
                 <table class="styled-table" id="walletTable">
@@ -311,7 +332,12 @@
                 document.getElementById(
                     'totalRecords'
                 ).textContent = response.total || 0;
-
+                document.getElementById(
+                    'totalEarnings'
+                ).textContent =
+                    Number(
+                        response.totalEarnings || 0
+                    ).toFixed(2);
                 const tbody =
                     document.querySelector(
                         '#walletTable tbody'
@@ -353,7 +379,7 @@
                         <td>
                             ${Number(game.agent_commission_total || 0).toFixed(2)}
                         </td>
-                        
+
                         <td>
                             ${Number(game.game_earning || 0).toFixed(2)}
                         </td>
