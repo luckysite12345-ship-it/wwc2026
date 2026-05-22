@@ -932,7 +932,7 @@ app.post('/api/update-commission', isAuthenticated, async (req, res) => {
 app.post('/api/convert-commission', isAuthenticated, async (req, res) => {
   const { userId, amount } = req.body;
   const currentUserId = req.session.user.id;
-
+  const client = await pool.connect();
   try {
     const user = await pool.query(
       'SELECT commission_earnings, parent_id FROM users WHERE id=$1',
@@ -955,32 +955,58 @@ app.post('/api/convert-commission', isAuthenticated, async (req, res) => {
 
     await pool.query('BEGIN');
 
-    await pool.query(
-      'UPDATE users SET points = points + $1, commission_earnings = commission_earnings - $1 WHERE id=$2',
-      [amount, userId]
-    );
-    const newBalance = updated.rows[0].points;
+    // ==========================
+        // UPDATE USER BALANCE
+        // ==========================
+        const updated =
+            await client.query(
 
-    // Wallet transaction log
-    await client.query(
-      `INSERT INTO wallet_transactions
-       (
-         user_id,
-         type,
-         amount,
-         balance_after,
-         description
-       )
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        userId,
-        'credit',
-        amount,
-        newBalance,
-        'Commission converted to points'
-      ]
-    );
-    
+                `
+                UPDATE users
+                SET
+                    points = points + $1,
+                    commission_earnings =
+                        commission_earnings - $1
+                WHERE id=$2
+                RETURNING points
+                `,
+
+                [amount, userId]
+
+            );
+
+        const newBalance =
+            updated.rows[0].points;
+
+        // ==========================
+        // INSERT WALLET TRANSACTION
+        // ==========================
+        await client.query(
+
+            `
+            INSERT INTO wallet_transactions
+            (
+                user_id,
+                type,
+                amount,
+                balance_after,
+                description
+            )
+            VALUES
+            ($1, $2, $3, $4, $5)
+            `,
+
+            [
+                userId,
+                'credit',
+                amount,
+                newBalance,
+                'Commission converted to points'
+            ]
+
+        );
+
+
     await pool.query('COMMIT');
 
     res.json({ message: "Commission converted" });
