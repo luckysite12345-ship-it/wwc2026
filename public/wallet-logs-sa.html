@@ -175,7 +175,7 @@
                 }
 
                 const data = await res.json();
-                if (data.role !== 'admin') {
+                if (data.role !== '-1') {
                     const summaryLink = document.getElementById('summaryLink');
                     if (summaryLink) summaryLink.style.display = 'none';
                 }
@@ -254,7 +254,7 @@
 
                 const res = await fetch(
 
-                    `/api/all-wallet-transactions?` +
+                    `/api/superadmin/all-wallet-transactions?` +
 
                     `search=${encodeURIComponent(search)}` +
                     `&role=${encodeURIComponent(role)}` +
@@ -276,7 +276,7 @@
                 }
 
                 const data = await res.json();
-
+                console.log(data);
                 totalPages = data.totalPages;
 
                 document.getElementById('pageInfo')
