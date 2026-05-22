@@ -5,6 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Wallet Logs</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+
+        .pagination{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:5px;
+            flex-wrap:nowrap;
+            margin-top:10px;
+        }
+
+        .pagination button{
+            padding:4px 10px;
+            font-size:12px;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+        }
+
+        .pagination span{
+            font-size:12px;
+            white-space:nowrap;
+        }
+
+        .action-btn{
+            padding:5px 10px;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+            font-size:12px;
+            font-weight:bold;
+        }
+
+        .cancel-btn{
+            background:red;
+            color:white;
+        }
+
+        @media (max-width:768px){
+
+            .pagination{
+                gap:3px;
+            }
+
+            .pagination button{
+                padding:3px 6px;
+                font-size:11px;
+            }
+
+            .pagination span{
+                font-size:11px;
+            }
+        }
+
+    </style>
 </head>
 
 <body class="dashboard-body">
@@ -102,7 +157,9 @@
                             <th>
                                 Description
                             </th>
-
+                            <th>
+                                Action
+                            </th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -193,7 +250,23 @@
                 maximumFractionDigits: 2
             });
         }
-       
+        function formatRole(role){
+
+            switch(role){
+
+                case 'agent':
+                    return 'Gold Agent';
+
+                case 'sub_agent':
+                    return 'Master Agent';
+
+                case 'master_agent':
+                    return 'Incorporator';
+
+                default:
+                    return role;
+            }
+        }
         // =========================
         // Hamburger & overlay
         // =========================
@@ -317,7 +390,7 @@
 
                         <td>${tx.username || '-'}</td>
 
-                        <td>${tx.role || '-'}</td>
+                        <td>${formatRole(tx.role) || '-'}</td>
 
                         <td>
                             ${new Date(
@@ -343,6 +416,14 @@
                         <td>
                             ${tx.description || '-'}
                         </td>
+                        <td>
+                            <button
+                                class="action-btn cancel-btn"
+                                onclick="cancelAmount(${tx.id})"
+                            >
+                                Cancel
+                            </button>
+                        </td>
                     `;
 
                     tbody.appendChild(row);
@@ -356,7 +437,41 @@
             }
 
         }
-        
+        async function cancelAmount(transactionId){
+
+            const confirmCancel =
+                confirm('Are you sure you want to cancel this amount?');
+
+            if(!confirmCancel) return;
+
+            try{
+
+                const res = await fetch(
+                    `/api/superadmin/cancel-wallet-transaction/${transactionId}`,
+                    {
+                        method:'POST',
+                        credentials:'include'
+                    }
+                );
+
+                const data = await res.json();
+
+                if(!res.ok){
+                    alert(data.error || 'Failed');
+                    return;
+                }
+
+                alert('Transaction cancelled successfully');
+
+                loadWalletLogs();
+
+            }catch(err){
+
+                console.error(err);
+
+                alert('Something went wrong');
+            }
+        }
         
         //Code for logout
         async function logout() {

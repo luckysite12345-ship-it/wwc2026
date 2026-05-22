@@ -472,6 +472,181 @@ router.get(
 
 });
 // =========================
+// CANCEL WALLET TRANSACTION
+// =========================
+router.post(
+    '/cancel-wallet-transaction/:id',
+    isSuperAdmin,
+    async (req, res) => {
+
+    const client = await pool.connect();
+
+    try {
+
+        const transactionId = req.params.id;
+
+        await client.query('BEGIN');
+
+        // =========================
+        // GET ORIGINAL TRANSACTION
+        // =========================
+        const txResult = await client.query(
+            `
+            SELECT *
+            FROM wallet_transactions
+            WHERE id = $1
+            `,
+            [transactionId]
+        );
+
+        if (txResult.rows.length === 0) {
+
+            await client.query('ROLLBACK');
+
+            return res.status(404).json({
+                error: 'Transaction not found'
+            });
+        }
+
+        const tx = txResult.rows[0];
+
+        // =========================
+        // CHECK IF ALREADY CANCELLED
+        // =========================
+        const existingCancel = await client.query(
+            `
+            SELECT id
+            FROM wallet_transactions
+            WHERE description = $1
+            LIMIT 1
+            `,
+            [`Cancellation of transaction #${tx.id}`]
+        );
+
+        if (existingCancel.rows.length > 0) {
+
+            await client.query('ROLLBACK');
+
+            return res.status(400).json({
+                error: 'Transaction already cancelled'
+            });
+        }
+
+        // =========================
+        // COMPUTE REVERSAL
+        // =========================
+        let walletAdjustment = 0;
+        let reversalType = '';
+
+        // If original was CREDIT
+        // means wallet was reduced
+        // cancellation should ADD back
+        if (tx.type === 'credit') {
+
+            walletAdjustment = Number(tx.amount);
+            reversalType = 'debit';
+
+        }
+
+        // If original was DEBIT
+        // means wallet was increased
+        // cancellation should REMOVE back
+        else {
+
+            walletAdjustment = -Number(tx.amount);
+            reversalType = 'credit';
+        }
+
+        // =========================
+        // UPDATE USER WALLET
+        // =========================
+        const userResult = await client.query(
+            `
+            UPDATE users
+            SET points = points + $1,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING points
+            `,
+            [
+                walletAdjustment,
+                tx.user_id
+            ]
+        );
+
+        if (userResult.rows.length === 0) {
+
+            await client.query('ROLLBACK');
+
+            return res.status(404).json({
+                error: 'User not found'
+            });
+        }
+
+        const updatedBalance =
+            userResult.rows[0].points;
+
+        // =========================
+        // CREATE REVERSAL RECORD
+        // =========================
+        await client.query(
+            `
+            INSERT INTO wallet_transactions
+            (
+                user_id,
+                type,
+                amount,
+                balance_after,
+                description,
+                created_at
+            )
+            VALUES
+            (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5,
+                NOW()
+            )
+            `,
+            [
+                tx.user_id,
+                reversalType,
+                tx.amount,
+                updatedBalance,
+                `Cancellation of transaction #${tx.id}`
+            ]
+        );
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Transaction cancelled successfully'
+        });
+
+    } catch (err) {
+
+        await client.query('ROLLBACK');
+
+        console.error(
+            'CANCEL WALLET TRANSACTION ERROR:',
+            err
+        );
+
+        res.status(500).json({
+            error: 'Failed to cancel transaction'
+        });
+
+    } finally {
+
+        client.release();
+
+    }
+
+});
+// =========================
 // GAME ARCHIVES
 // =========================
 router.get('/game-archives', isSuperAdmin, async (req, res) => {
