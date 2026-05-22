@@ -242,23 +242,234 @@ router.get('/network/:id', isSuperAdmin, async (req, res) => {
         res.status(500).json({ error: 'Failed to load users' });
     }
 });
-router.get('/all-wallet-transactions', async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT DISTINCT username
-            FROM wallet_transactions
-            UNION
-            SELECT username FROM users
-            WHERE role != 'declarator'
-            ORDER BY username ASC;
-        `);
+// =========================
+// ALL WALLET TRANSACTIONS
+// =========================
+router.get(
+    '/all-wallet-transactions',
+    isSuperAdmin,
+    async (req, res) => {
 
-        res.json(result.rows);
+    try {
+
+        const {
+            search = '',
+            role = '',
+            from = '',
+            to = '',
+            page = 1,
+            limit = 25,
+            sort = 'created_at',
+            order = 'DESC'
+        } = req.query;
+
+        // =========================
+        // SAFE LIMIT
+        // =========================
+        const safeLimit =
+            [25, 50, 100].includes(Number(limit))
+                ? Number(limit)
+                : 25;
+
+        const offset =
+            (Number(page) - 1) * safeLimit;
+
+        // =========================
+        // SAFE SORT
+        // =========================
+        const allowedSorts = [
+            'username',
+            'role',
+            'created_at',
+            'type',
+            'amount',
+            'balance_after'
+        ];
+
+        const safeSort =
+            allowedSorts.includes(sort)
+                ? sort
+                : 'created_at';
+
+        const safeOrder =
+            order === 'ASC'
+                ? 'ASC'
+                : 'DESC';
+
+        // =========================
+        // FILTERS
+        // =========================
+        let conditions = [
+            `u.role != 'declarator'`
+        ];
+
+        let values = [];
+        let index = 1;
+
+        // SEARCH USERNAME
+        if (search) {
+
+            conditions.push(`
+                u.username ILIKE $${index}
+            `);
+
+            values.push(`%${search}%`);
+
+            index++;
+        }
+
+        // ROLE FILTER
+        if (role) {
+
+            conditions.push(`
+                u.role = $${index}
+            `);
+
+            values.push(role);
+
+            index++;
+        }
+
+        // FROM DATE
+        if (from) {
+
+            conditions.push(`
+                DATE(wt.created_at) >= $${index}
+            `);
+
+            values.push(from);
+
+            index++;
+        }
+
+        // TO DATE
+        if (to) {
+
+            conditions.push(`
+                DATE(wt.created_at) <= $${index}
+            `);
+
+            values.push(to);
+
+            index++;
+        }
+
+        const whereClause =
+            conditions.length > 0
+                ? `WHERE ${conditions.join(' AND ')}`
+                : '';
+
+        // =========================
+        // TOTAL RECORDS
+        // =========================
+        const countQuery = await pool.query(
+            `
+            SELECT COUNT(*) AS total
+
+            FROM wallet_transactions wt
+
+            LEFT JOIN users u
+                ON u.id = wt.user_id
+
+            ${whereClause}
+            `,
+            values
+        );
+
+        const total =
+            Number(countQuery.rows[0].total);
+
+        // =========================
+        // SORT MAP
+        // =========================
+        const sortMap = {
+
+            username:
+                'u.username',
+
+            role:
+                'u.role',
+
+            created_at:
+                'wt.created_at',
+
+            type:
+                'wt.type',
+
+            amount:
+                'wt.amount',
+
+            balance_after:
+                'wt.balance_after'
+        };
+
+        // =========================
+        // MAIN QUERY
+        // =========================
+        values.push(safeLimit);
+        values.push(offset);
+
+        const query = `
+            SELECT
+
+                wt.id,
+                wt.type,
+                wt.amount,
+                wt.balance_after,
+                wt.description,
+                wt.created_at,
+
+                u.username,
+                u.role
+
+            FROM wallet_transactions wt
+
+            LEFT JOIN users u
+                ON u.id = wt.user_id
+
+            ${whereClause}
+
+            ORDER BY
+                ${sortMap[safeSort]}
+                ${safeOrder}
+
+            LIMIT $${index}
+            OFFSET $${index + 1}
+        `;
+
+        const result =
+            await pool.query(query, values);
+
+        res.json({
+
+            rows: result.rows,
+
+            total,
+
+            currentPage:
+                Number(page),
+
+            totalPages:
+                Math.ceil(
+                    total / safeLimit
+                )
+
+        });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to load logs' });
+
+        console.error(
+            'WALLET LOGS ERROR:',
+            err
+        );
+
+        res.status(500).json({
+            error:
+                'Failed to load wallet logs'
+        });
+
     }
+
 });
 // =========================
 // GAME ARCHIVES

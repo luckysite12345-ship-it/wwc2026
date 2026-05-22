@@ -40,22 +40,88 @@
             <h2>Wallet Logs</h2>
 
             <div class="table-wrapper">
-                <select id="userFilter" onchange="loadWalletLogs()">
-                    <option value="">All Users</option>
-                </select>
+                <div class="filters">
+
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search username..."
+                    >
+
+                    <select id="roleFilter">
+                        <option value="">All Roles</option>
+                        <option value="player">Player</option>
+                        <option value="agent">Agent</option>
+                        <option value="sub_agent">Sub Agent</option>
+                        <option value="master_agent">Master Agent</option>
+                        <option value="admin">Admin</option>
+                    </select>
+
+                    <input type="date" id="fromDate">
+                    <input type="date" id="toDate">
+
+                    <select id="limitSelect">
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+
+                    <button onclick="applyFilters()">
+                        Filter
+                    </button>
+
+                </div>
                 <table class="styled-table" id="walletTable">
                     <thead>
                         <tr>
-                            <th>Username</th>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                            <th>Balance After</th>
-                            <th>Description</th>
+
+                            <th onclick="sortTable('username')">
+                                Username
+                            </th>
+
+                            <th onclick="sortTable('role')">
+                                Role
+                            </th>
+
+                            <th onclick="sortTable('created_at')">
+                                Date
+                            </th>
+
+                            <th onclick="sortTable('type')">
+                                Type
+                            </th>
+
+                            <th onclick="sortTable('amount')">
+                                Amount
+                            </th>
+
+                            <th onclick="sortTable('balance_after')">
+                                Balance After
+                            </th>
+
+                            <th>
+                                Description
+                            </th>
+
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
+                <div class="pagination">
+
+                    <button onclick="firstPage()">First</button>
+
+                    <button onclick="prevPage()">Prev</button>
+
+                    <span id="pageInfo">
+                        Page 1
+                    </span>
+
+                    <button onclick="nextPage()">Next</button>
+
+                    <button onclick="lastPage()">Last</button>
+
+                </div>
             </div>
         </div>
 
@@ -161,11 +227,48 @@
                 }
             }
         });
+        let currentPage = 1;
+        let totalPages = 1;
+
+        let currentSort = 'created_at';
+        let currentOrder = 'DESC';
+
         async function loadWalletLogs() {
+
             try {
-                const res = await fetch('/api/all-wallet-transactions', {
-                    credentials: 'include'
-                });
+
+                const search =
+                    document.getElementById('searchInput').value;
+
+                const role =
+                    document.getElementById('roleFilter').value;
+
+                const from =
+                    document.getElementById('fromDate').value;
+
+                const to =
+                    document.getElementById('toDate').value;
+
+                const limit =
+                    document.getElementById('limitSelect').value;
+
+                const res = await fetch(
+
+                    `/api/all-wallet-transactions?` +
+
+                    `search=${encodeURIComponent(search)}` +
+                    `&role=${encodeURIComponent(role)}` +
+                    `&from=${from}` +
+                    `&to=${to}` +
+                    `&page=${currentPage}` +
+                    `&limit=${limit}` +
+                    `&sort=${currentSort}` +
+                    `&order=${currentOrder}`,
+
+                    {
+                        credentials: 'include'
+                    }
+                );
 
                 if (res.status === 401) {
                     window.location.href = '/';
@@ -174,45 +277,84 @@
 
                 const data = await res.json();
 
-                const tbody = document.querySelector('#walletTable tbody');
+                totalPages = data.totalPages;
+
+                document.getElementById('pageInfo')
+                    .textContent =
+                    `Page ${data.currentPage} of ${data.totalPages}`;
+
+                const tbody =
+                    document.querySelector(
+                        '#walletTable tbody'
+                    );
+
                 tbody.innerHTML = '';
 
-                const selectedUser = document.getElementById('userFilter')?.value;
+                if (data.rows.length === 0) {
 
-                let filtered = data;
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7">
+                                No records found
+                            </td>
+                        </tr>
+                    `;
 
-                if (selectedUser) {
-                    filtered = data.filter(tx => tx.username === selectedUser);
-                }
-
-                if (filtered.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6">No records found</td></tr>`;
                     return;
                 }
 
-                filtered.forEach(tx => {
-                    const row = document.createElement('tr');
+                data.rows.forEach(tx => {
 
-                    const typeIcon = tx.type === 'credit' ? '↑' : '↓';
-                    const typeColor = tx.type === 'credit' ? 'red' : 'green';
+                    const row =
+                        document.createElement('tr');
+
+                    const typeColor =
+                        tx.type === 'credit'
+                            ? 'red'
+                            : 'blue';
 
                     row.innerHTML = `
+
                         <td>${tx.username || '-'}</td>
-                        <td>${new Date(tx.created_at).toLocaleString()}</td>
-                        <td style="color: ${typeColor}; font-weight: bold;">
-                            ${typeIcon} ${tx.type}
+
+                        <td>${tx.role || '-'}</td>
+
+                        <td>
+                            ${new Date(
+                                tx.created_at
+                            ).toLocaleString()}
                         </td>
-                        <td>${formatMoney(tx.amount)}</td>
-                        <td>${formatMoney(tx.balance_after)}</td>
-                        <td>${tx.description}</td>
+
+                        <td style="
+                            color:${typeColor};
+                            font-weight:bold;
+                        ">
+                            ${tx.type}
+                        </td>
+
+                        <td>
+                            ${formatMoney(tx.amount)}
+                        </td>
+
+                        <td>
+                            ${formatMoney(tx.balance_after)}
+                        </td>
+
+                        <td>
+                            ${tx.description || '-'}
+                        </td>
                     `;
 
                     tbody.appendChild(row);
+
                 });
 
             } catch (err) {
+
                 console.error(err);
+
             }
+
         }
         
         
@@ -239,37 +381,74 @@
                 showSnackbar("Logout failed", "error");
             }
         }
-        async function loadUsers() {
-            try {
-                const res = await fetch('/api/all-wallet-transactions', {
-                    credentials: 'include'
-                });
+        
+        function applyFilters() {
 
-                const data = await res.json();
+            currentPage = 1;
 
-                const select = document.getElementById('userFilter');
-                select.innerHTML = `<option value="">All Users</option>`;
+            loadWalletLogs();
 
-                const seen = new Set();
+        }
 
-                data.forEach(tx => {
-                    if (!tx.username) return;
+        function sortTable(column) {
 
-                    const key = tx.username.toLowerCase();
-                    if (seen.has(key)) return;
+            if (currentSort === column) {
 
-                    seen.add(key);
+                currentOrder =
+                    currentOrder === 'ASC'
+                        ? 'DESC'
+                        : 'ASC';
 
-                    const opt = document.createElement('option');
-                    opt.value = tx.username;
-                    opt.textContent = tx.username;
+            } else {
 
-                    select.appendChild(opt);
-                });
+                currentSort = column;
 
-            } catch (err) {
-                console.error(err);
+                currentOrder = 'ASC';
+
             }
+
+            loadWalletLogs();
+
+        }
+
+        function firstPage() {
+
+            currentPage = 1;
+
+            loadWalletLogs();
+
+        }
+
+        function prevPage() {
+
+            if (currentPage > 1) {
+
+                currentPage--;
+
+                loadWalletLogs();
+
+            }
+
+        }
+
+        function nextPage() {
+
+            if (currentPage < totalPages) {
+
+                currentPage++;
+
+                loadWalletLogs();
+
+            }
+
+        }
+
+        function lastPage() {
+
+            currentPage = totalPages;
+
+            loadWalletLogs();
+
         }
         // =========================
         // INIT
@@ -277,7 +456,6 @@
         async function init() {
             await loadConfig();
             await checkSession();
-            await loadUsers();
             await loadWalletLogs();
         }
 
