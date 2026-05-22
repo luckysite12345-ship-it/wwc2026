@@ -959,7 +959,28 @@ app.post('/api/convert-commission', isAuthenticated, async (req, res) => {
       'UPDATE users SET points = points + $1, commission_earnings = commission_earnings - $1 WHERE id=$2',
       [amount, userId]
     );
+    const newBalance = updated.rows[0].points;
 
+    // Wallet transaction log
+    await client.query(
+      `INSERT INTO wallet_transactions
+       (
+         user_id,
+         type,
+         amount,
+         balance_after,
+         description
+       )
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        userId,
+        'credit',
+        amount,
+        newBalance,
+        'Commission converted to points'
+      ]
+    );
+    
     await pool.query('COMMIT');
 
     res.json({ message: "Commission converted" });
@@ -971,7 +992,7 @@ app.post('/api/convert-commission', isAuthenticated, async (req, res) => {
   }
 });
 // ==========================
-// WITHDRAW COMMISSION API (ADMIN ONLY)
+// WITHDRAW POINTS API (ADMIN ONLY)
 // ==========================
 app.post('/api/withdraw-points', isAuthenticated, async (req, res) => {
   const { userId, amount } = req.body;

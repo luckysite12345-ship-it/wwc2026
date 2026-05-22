@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <title>Commission Conversion Logs</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+
+        #pagination button {
+
+            width: auto !important;
+
+            min-width: 40px;
+
+            padding: 6px 12px;
+
+            margin: 0;
+
+            display: inline-block;
+
+            flex: 0 0 auto;
+
+        }
+
+        #pagination {
+
+            width: 100%;
+
+            overflow-x: auto;
+
+            white-space: nowrap;
+
+        }
+
+    </style>
+
+</head>
+
+<body class="dashboard-body">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+
+        <h2>
+            Welcome,
+            <span class="username">
+                Super Admin
+            </span>
+        </h2>
+
+        <a href="superadmin.html">
+            🏠 Dashboard
+        </a>
+
+        <a href="wallet-logs-sa.html">
+            📄 Wallet Logs
+        </a>
+
+        <a href="commission-logs-sa.html">
+            💰 Commission Logs
+        </a>
+
+        <a href="commission-conversions-sa.html">
+            🔄 Commission Conversions
+        </a>
+
+        <a href="gamearchives.html">
+            🗂 Fight Logs
+        </a>
+
+        <div class="category">
+            Downlines
+        </div>
+
+        <a href="agents-sa.html">
+            👥 Agents
+        </a>
+
+        <a href="players-sa.html">
+            🧑 Players
+        </a>
+
+        <div class="category">
+            Settings
+        </div>
+
+        <a href="change-password-superadmin.html">
+            🔑 Change Password
+        </a>
+
+        <a href="#" onclick="logout()">
+            🚪 Logout
+        </a>
+
+    </div>
+
+    <!-- Overlay -->
+    <div
+        id="overlay"
+        class="overlay"
+        onclick="closeSidebar()"
+    ></div>
+
+    <!-- MAIN -->
+    <div class="main">
+
+        <div class="header">
+
+            <div
+                class="hamburger"
+                onclick="toggleSidebar()"
+            >
+                ☰
+            </div>
+
+        </div>
+
+        <div class="content">
+
+            <div id="snackbar"></div>
+
+            <h2>
+                Commission Conversion Logs
+            </h2>
+
+            <div class="filters">
+
+                <input
+                    type="text"
+                    id="search"
+                    placeholder="Search username"
+                >
+
+                <input
+                    type="date"
+                    id="from"
+                >
+
+                <input
+                    type="date"
+                    id="to"
+                >
+
+                <select
+                    id="limitSelect"
+                    onchange="changeLimit()"
+                >
+                    <option value="25">
+                        25 Rows
+                    </option>
+
+                    <option value="50">
+                        50 Rows
+                    </option>
+
+                    <option value="100">
+                        100 Rows
+                    </option>
+
+                </select>
+
+                <button onclick="searchLogs()">
+                    Search
+                </button>
+
+            </div>
+
+            <div
+                style="
+                    margin:10px 0;
+                    font-weight:bold;
+                "
+            >
+                Total Converted:
+                ₱<span id="totalConverted">0.00</span>
+            </div>
+
+            <div class="table-wrapper">
+
+                <table
+                    class="styled-table"
+                    id="conversionTable"
+                >
+
+                    <thead>
+
+                        <tr>
+
+                            <th onclick="sortTable('created_at')">
+                                Date
+                            </th>
+
+                            <th onclick="sortTable('username')">
+                                Username
+                            </th>
+
+                            <th onclick="sortTable('amount')">
+                                Converted Amount
+                            </th>
+
+                            <th onclick="sortTable('balance_after')">
+                                Balance After
+                            </th>
+
+                            <th>
+                                Description
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody></tbody>
+
+                </table>
+
+                <div
+                    id="pagination"
+                    style="
+                        margin-top:15px;
+                        display:flex;
+                        flex-wrap:wrap;
+                        gap:5px;
+                        align-items:center;
+                    "
+                ></div>
+
+            </div>
+
+        </div>
+
+        <footer>
+            © 2024
+            <span class="website-name"></span>.
+            All rights reserved.
+        </footer>
+
+    </div>
+
+<script>
+
+    // =========================
+    // Global App Config
+    // =========================
+    let APP_CONFIG = {
+
+        websiteName: "Website",
+
+        websiteUrl: window.location.origin
+
+    };
+
+    let currentPage = 1;
+
+    let currentLimit = 25;
+
+    let currentSort = 'created_at';
+
+    let currentOrder = 'DESC';
+
+    // =========================
+    // Load Config
+    // =========================
+    async function loadConfig() {
+
+        try {
+
+            const res =
+                await fetch('/api/config');
+
+            const data =
+                await res.json();
+
+            APP_CONFIG = data;
+
+            document.title =
+                `Commission Conversion Logs - ${data.websiteName}`;
+
+            document
+                .querySelectorAll('.website-name')
+                .forEach(el => {
+
+                    el.textContent =
+                        data.websiteName;
+
+                });
+
+        } catch (err) {
+
+            console.error(err);
+
+        }
+
+    }
+
+    async function checkSession() {
+
+        try {
+
+            const res = await fetch(
+                '/api/dashboard',
+                {
+                    credentials: 'include'
+                }
+            );
+
+            if (res.status === 401) {
+
+                window.location.href = '/';
+
+                return;
+
+            }
+
+            const data = await res.json();
+
+            document
+                .querySelectorAll('.username')
+                .forEach(el => {
+
+                    el.textContent =
+                        data.username;
+
+                });
+
+        } catch (err) {
+
+            console.error(err);
+
+            window.location.href = '/';
+
+        }
+
+    }
+
+    // =========================
+    // Sidebar
+    // =========================
+    function toggleSidebar() {
+
+        const sidebar =
+            document.getElementById('sidebar');
+
+        const overlay =
+            document.getElementById('overlay');
+
+        if (window.innerWidth <= 768) {
+
+            sidebar.classList.toggle('active');
+
+            overlay.classList.toggle('active');
+
+        } else {
+
+            sidebar.classList.toggle('collapsed');
+
+        }
+
+    }
+
+    function closeSidebar() {
+
+        document
+            .getElementById('sidebar')
+            .classList.remove('active');
+
+        document
+            .getElementById('overlay')
+            .classList.remove('active');
+
+    }
+
+    document.addEventListener(
+        'click',
+        function(event) {
+
+            const sidebar =
+                document.getElementById('sidebar');
+
+            if (
+
+                window.innerWidth <= 768 &&
+
+                sidebar.classList.contains('active')
+
+            ) {
+
+                if (
+
+                    !sidebar.contains(event.target) &&
+
+                    !event.target.classList.contains(
+                        'hamburger'
+                    )
+
+                ) {
+
+                    closeSidebar();
+
+                }
+
+            }
+
+        }
+    );
+
+    // =========================
+    // LOAD LOGS
+    // =========================
+    async function loadConversionLogs() {
+
+        try {
+
+            const search =
+                document.getElementById('search').value || '';
+
+            const from =
+                document.getElementById('from').value || '';
+
+            const to =
+                document.getElementById('to').value || '';
+
+            const params =
+                new URLSearchParams({
+
+                    search,
+                    from,
+                    to,
+
+                    page: currentPage,
+
+                    limit: currentLimit,
+
+                    sort: currentSort,
+
+                    order: currentOrder
+
+                });
+
+            const res = await fetch(
+
+                `/api/superadmin/commission-conversions?${params}`,
+
+                {
+                    credentials: 'include'
+                }
+
+            );
+
+            if (res.status === 401) {
+
+                window.location.href = '/';
+
+                return;
+
+            }
+
+            const data =
+                await res.json();
+
+            const tbody =
+                document.querySelector(
+                    '#conversionTable tbody'
+                );
+
+            tbody.innerHTML = '';
+
+            data.rows.forEach(tx => {
+
+                const row =
+                    document.createElement('tr');
+
+                row.innerHTML = `
+
+                    <td>
+                        ${new Date(
+                            tx.created_at
+                        ).toLocaleString()}
+                    </td>
+
+                    <td>
+                        ${tx.username || '-'}
+                    </td>
+
+                    <td>
+                        ₱${Number(
+                            tx.amount || 0
+                        ).toFixed(2)}
+                    </td>
+
+                    <td>
+                        ₱${Number(
+                            tx.balance_after || 0
+                        ).toFixed(2)}
+                    </td>
+
+                    <td>
+                        ${tx.description || '-'}
+                    </td>
+
+                `;
+
+                tbody.appendChild(row);
+
+            });
+
+            document.getElementById(
+                'totalConverted'
+            ).textContent =
+
+                Number(
+                    data.totalConverted || 0
+                ).toFixed(2);
+
+            renderPagination(
+
+                data.currentPage,
+
+                data.totalPages,
+
+                data.total
+
+            );
+
+        } catch (err) {
+
+            console.error(err);
+
+        }
+
+    }
+
+    function searchLogs() {
+
+        currentPage = 1;
+
+        loadConversionLogs();
+
+    }
+
+    function changeLimit() {
+
+        currentLimit = Number(
+
+            document.getElementById(
+                'limitSelect'
+            ).value
+
+        );
+
+        currentPage = 1;
+
+        loadConversionLogs();
+
+    }
+
+    function goPage(page) {
+
+        if (page < 1) return;
+
+        currentPage = page;
+
+        loadConversionLogs();
+
+    }
+
+    function sortTable(column) {
+
+        if (currentSort === column) {
+
+            currentOrder =
+                currentOrder === 'ASC'
+                ? 'DESC'
+                : 'ASC';
+
+        } else {
+
+            currentSort = column;
+
+            currentOrder = 'ASC';
+
+        }
+
+        loadConversionLogs();
+
+    }
+
+    function renderPagination(
+        currentPage,
+        totalPages,
+        totalRows
+    ) {
+
+        const container =
+            document.getElementById(
+                'pagination'
+            );
+
+        let html = '';
+
+        html += `
+            <button
+                onclick="goPage(1)"
+                ${currentPage === 1 ? 'disabled' : ''}
+            >
+                Start
+            </button>
+        `;
+
+        html += `
+            <button
+                onclick="goPage(${currentPage - 1})"
+                ${currentPage === 1 ? 'disabled' : ''}
+            >
+                Prev
+            </button>
+        `;
+
+        for (
+
+            let i = Math.max(1, currentPage - 2);
+
+            i <= Math.min(
+                totalPages,
+                currentPage + 2
+            );
+
+            i++
+
+        ) {
+
+            html += `
+                <button
+                    onclick="goPage(${i})"
+
+                    style="
+                        ${
+                            i === currentPage
+                            ? 'font-weight:bold;'
+                            : ''
+                        }
+                    "
+                >
+                    ${i}
+                </button>
+            `;
+
+        }
+
+        html += `
+            <button
+                onclick="goPage(${currentPage + 1})"
+                ${currentPage === totalPages ? 'disabled' : ''}
+            >
+                Next
+            </button>
+        `;
+
+        html += `
+            <button
+                onclick="goPage(${totalPages})"
+                ${currentPage === totalPages ? 'disabled' : ''}
+            >
+                End
+            </button>
+        `;
+
+        const start =
+            ((currentPage - 1) * currentLimit) + 1;
+
+        const end =
+            Math.min(
+                currentPage * currentLimit,
+                totalRows
+            );
+
+        html += `
+
+            <span
+                style="
+                    margin-left:10px;
+                    font-weight:bold;
+                "
+            >
+                Showing
+                ${start}-${end}
+                of ${totalRows}
+            </span>
+
+        `;
+
+        container.innerHTML = html;
+
+    }
+
+    // =========================
+    // Logout
+    // =========================
+    async function logout() {
+
+        try {
+
+            const res = await fetch(
+                '/api/logout',
+                {
+                    method: 'GET',
+                    credentials: 'include'
+                }
+            );
+
+            await res.json();
+
+            showSnackbar(
+                "Logged out successfully"
+            );
+
+            setTimeout(() => {
+
+                window.location.href =
+                    '/index.html';
+
+            }, 1000);
+
+        } catch (err) {
+
+            console.error(err);
+
+            showSnackbar(
+                "Logout failed",
+                "error"
+            );
+
+        }
+
+    }
+
+    // =========================
+    // INIT
+    // =========================
+    async function init() {
+
+        await loadConfig();
+
+        await checkSession();
+
+        loadConversionLogs();
+
+    }
+
+    init();
+
+</script>
+
+</body>
+</html>

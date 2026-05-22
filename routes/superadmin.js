@@ -995,4 +995,155 @@ router.get(
     }
 
 });
+// =========================
+// COMMISSION CONVERSION LOGS
+// =========================
+router.get(
+  '/commission-conversions',
+  isSuperAdmin,
+  async (req, res) => {
+
+    try {
+
+      const page =
+        parseInt(req.query.page) || 1;
+
+      const limit =
+        parseInt(req.query.limit) || 25;
+
+      const offset =
+        (page - 1) * limit;
+
+      const search =
+        req.query.search || '';
+
+      const from =
+        req.query.from || '';
+
+      const to =
+        req.query.to || '';
+
+      let where = `
+        WHERE wt.description ILIKE '%commission%'
+      `;
+
+      const values = [];
+      let index = 1;
+
+      // =========================
+      // SEARCH
+      // =========================
+      if (search) {
+
+        where += `
+          AND (
+            u.username ILIKE $${index}
+          )
+        `;
+
+        values.push(`%${search}%`);
+
+        index++;
+
+      }
+
+      // =========================
+      // FROM DATE
+      // =========================
+      if (from) {
+
+        where += `
+          AND wt.created_at >= $${index}
+        `;
+
+        values.push(from);
+
+        index++;
+
+      }
+
+      // =========================
+      // TO DATE
+      // =========================
+      if (to) {
+
+        where += `
+          AND wt.created_at <= $${index}
+        `;
+
+        values.push(`${to} 23:59:59`);
+
+        index++;
+
+      }
+
+      // =========================
+      // TOTAL ROWS
+      // =========================
+      const totalQuery = await pool.query(
+        `
+          SELECT COUNT(*) AS total
+          FROM wallet_transactions wt
+          LEFT JOIN users u
+          ON u.id = wt.user_id
+          ${where}
+        `,
+        values
+      );
+
+      const total =
+        Number(totalQuery.rows[0].total);
+
+      // =========================
+      // FETCH DATA
+      // =========================
+      values.push(limit);
+      values.push(offset);
+
+      const rowsQuery = await pool.query(
+        `
+          SELECT
+            wt.id,
+            wt.user_id,
+            u.username,
+            wt.amount,
+            wt.balance_after,
+            wt.description,
+            wt.created_at
+          FROM wallet_transactions wt
+          LEFT JOIN users u
+          ON u.id = wt.user_id
+          ${where}
+          ORDER BY wt.created_at DESC
+          LIMIT $${index}
+          OFFSET $${index + 1}
+        `,
+        values
+      );
+
+      res.json({
+
+        rows: rowsQuery.rows,
+
+        currentPage: page,
+
+        totalPages:
+          Math.ceil(total / limit),
+
+        total
+
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+        error: 'Server error'
+      });
+
+    }
+
+  }
+);
 module.exports = router;
