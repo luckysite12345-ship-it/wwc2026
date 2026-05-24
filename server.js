@@ -16,6 +16,7 @@ const { startDummyEngine, stopDummyEngine } = require('./services/dummyEngine');
 const { initWebSocket, broadcast } = require('./websocket');
 const betsRoutes = require('./routes/bets');
 const authRoutes = require('./routes/auth');
+const agentsRoutes = require('./routes/agents');
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 15 minutes
   max: 5, // allow max 5 attempts per window per IP
@@ -428,6 +429,7 @@ app.use(session({
 }));
 app.use('/api', authRoutes);
 app.use('/api/superadmin', superadminRoutes);
+app.use(agentsRoutes);
 // ==========================
 // AUTH MIDDLEWARE
 // ==========================

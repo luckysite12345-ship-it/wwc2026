@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/connection');
 const crypto = require('crypto');
-
+console.log('agents.js loaded');
 // ==========================
 // CONVERT COMMISSION
 // ==========================
