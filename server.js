@@ -429,7 +429,7 @@ app.use(session({
 }));
 app.use('/api', authRoutes);
 app.use('/api/superadmin', superadminRoutes);
-app.use(agentsRoutes);
+app.use('/api', agentsRoutes);
 // ==========================
 // AUTH MIDDLEWARE
 // ==========================

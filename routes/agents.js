@@ -6,7 +6,7 @@ console.log('agents.js loaded');
 // ==========================
 // CONVERT COMMISSION
 // ==========================
-router.post('/api/convert-commission', async (req, res) => {
+router.post('/convert-commission', async (req, res) => {
 
     if (!req.session.user) {
         return res.status(401).json({
@@ -14,7 +14,7 @@ router.post('/api/convert-commission', async (req, res) => {
         });
     }
 
-    const userId = req.session.user.id;
+    const userId = req.session.user.userId;
     const { amount } = req.body;
 
     if (!amount || Number(amount) <= 0) {
@@ -217,3 +217,5 @@ router.get('/network-tree/:userId', async (req, res) => {
         res.status(500).json({ error: "Failed to load network" });
     }
 });
+
+module.exports = router;
