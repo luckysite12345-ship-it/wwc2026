@@ -765,7 +765,7 @@ button:disabled {
             });
             
             const data = await res.json();
-            document.getElementById('betAmount').value = "";
+            //document.getElementById('betAmount').value = "";
             if (!res.ok) {
                 throw new Error(data.error || "Bet failed");
             }
