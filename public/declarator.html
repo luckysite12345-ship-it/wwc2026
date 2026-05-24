@@ -407,7 +407,7 @@ button:disabled {
                 case "bet_result":
                     if (msg.success) {
                         showSnackbar("Bet placed!");
-                        document.getElementById('betAmount').value = '';
+                        //document.getElementById('betAmount').value = '';
                     } else {
                         showSnackbar(msg.error || "Bet failed", "error");
                     }
