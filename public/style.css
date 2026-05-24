@@ -653,7 +653,80 @@ button:active {
 .copy-btn:hover {
     background-color: #444;
 }
+/* ==========================
+   MEMBERSHIP ACTION BUTTONS
+========================== */
 
+.membership-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 15px;
+}
+
+/* Override old global button width */
+.membership-actions button {
+    width: auto !important;
+    min-width: 160px;
+    margin: 0;
+}
+
+/* Convert Button */
+.convert-btn {
+    background: #16a34a;
+    color: #fff;
+}
+
+.convert-btn:hover {
+    background: #15803d;
+}
+/* ==========================
+   CONVERT COMMISSION MODAL
+========================== */
+
+#convertModal .modal-content {
+    width: 320px;
+    max-width: 90%;
+}
+
+.modal-label {
+    text-align: left;
+    margin: 15px 0 8px;
+    color: #cbd5e1;
+    font-size: 14px;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+.modal-input:focus {
+    border-color: #14b8a6;
+    outline: none;
+    box-shadow: 0 0 5px rgba(20,184,166,.5);
+}
+
+.modal-btn {
+    width: 100%;
+    margin-top: 15px;
+}
+
+.close-modal {
+    float: right;
+    font-size: 24px;
+    cursor: pointer;
+    color: #94a3b8;
+}
+
+.close-modal:hover {
+    color: #fff;
+}
 .membership-text {
     text-align: center;
     font-size: 14px;

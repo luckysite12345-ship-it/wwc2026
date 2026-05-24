@@ -62,6 +62,9 @@
                             <input class="membership-link" type="text" value="" readonly>
                         </div>
                         <button class="copy-btn" onclick="copyLink()">COPY YOUR LINK</button>
+                        <button class="convert-btn" onclick="openConvertModal()">
+                            CONVERT COMMISSION
+                        </button>
                     </div>
                     
                 </div>
@@ -139,7 +142,30 @@
         </footer>
 
     </div>
+    <!-- Convert Commission Modal -->
+    <div id="convertModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeConvertModal()">&times;</span>
 
+            <h2>Convert Commission</h2>
+
+            <p class="modal-label">
+                Enter amount to convert from commission to points
+            </p>
+
+            <input 
+                type="number" 
+                id="convertAmount"
+                class="modal-input"
+                placeholder="Enter amount"
+                min="1"
+            >
+
+            <button class="modal-btn" onclick="convertCommission()">
+                CONVERT
+            </button>
+        </div>
+    </div>
     <!-- JAVASCRIPT -->
     <script>
         let APP_CONFIG = {
@@ -374,6 +400,64 @@
             } catch (err) {
                 console.error(err);
                 showSnackbar("Logout failed", "error");
+            }
+        }
+        function openConvertModal() {
+            document.getElementById('convertModal').style.display = 'block';
+        }
+
+        function closeConvertModal() {
+            document.getElementById('convertModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('convertModal');
+
+            if (event.target === modal) {
+                closeConvertModal();
+            }
+        };
+
+        async function convertCommission() {
+
+            const amount = Number(
+                document.getElementById('convertAmount').value
+            );
+
+            if (!amount || amount <= 0) {
+                showSnackbar("Invalid amount", "error");
+                return;
+            }
+
+            try {
+
+                const res = await fetch('/api/convert-commission', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ amount })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    showSnackbar(data.error || "Conversion failed", "error");
+                    return;
+                }
+
+                showSnackbar("Commission converted successfully");
+
+                closeConvertModal();
+
+                document.getElementById('convertAmount').value = '';
+
+                loadDashboardWallets();
+
+            } catch (err) {
+                console.error(err);
+                showSnackbar("Server error", "error");
             }
         }
         // Call after session check
