@@ -188,7 +188,7 @@ button:disabled {
         <button onclick="placeChip(203521)">203521</button>
         <button onclick="placeChip(300125)">300125</button>
     </div>
-     <div class="row">
+    <div class="row">
         <div class="total-box meron-bg">PLAYING MERON BETS: </div>
         <div class="total-box wala-bg">PLAYING WALA BETS: </div>
     </div>
@@ -221,15 +221,22 @@ button:disabled {
         </div>
     </div>
     <div class="bets-container">
-    <div class="bet-column">
-        <h3>MERON</h3>
-        <div id="meronList"></div>
-    </div>
 
-    <div class="bet-column">
-        <h3>WALA</h3>
-        <div id="walaList"></div>
-    </div>
+        <div class="bet-column">
+            <h3>MERON</h3>
+            <div id="meronList"></div>
+        </div>
+
+        <div class="bet-column">
+            <h3>WALA</h3>
+            <div id="walaList"></div>
+        </div>
+
+        <div class="bet-column">
+            <h3>DRAW</h3>
+            <div id="drawList"></div>
+        </div>
+
     </div>
 </div>
 
@@ -914,26 +921,59 @@ button:disabled {
     
 
     function renderBets(data){
+
         const meronDiv = document.getElementById('meronList');
         const walaDiv = document.getElementById('walaList');
+        const drawDiv = document.getElementById('drawList');
 
         meronDiv.innerHTML = '';
         walaDiv.innerHTML = '';
+        drawDiv.innerHTML = '';
 
         data.meron.forEach(bet => {
+
             meronDiv.innerHTML += `
                 <div class="bet-item">
-                    <span>${bet.username}</span>
-                    <span>${Number(bet.amount).toLocaleString()}</span>
+                    <span>
+                        ${bet.username}
+                        (${Number(bet.points).toLocaleString()})
+                    </span>
+
+                    <span>
+                        ${Number(bet.amount).toLocaleString()}
+                    </span>
                 </div>
             `;
         });
 
         data.wala.forEach(bet => {
+
             walaDiv.innerHTML += `
                 <div class="bet-item">
-                    <span>${bet.username}</span>
-                    <span>${Number(bet.amount).toLocaleString()}</span>
+                    <span>
+                        ${bet.username}
+                        (${Number(bet.points).toLocaleString()})
+                    </span>
+
+                    <span>
+                        ${Number(bet.amount).toLocaleString()}
+                    </span>
+                </div>
+            `;
+        });
+
+        data.draw.forEach(bet => {
+
+            drawDiv.innerHTML += `
+                <div class="bet-item">
+                    <span>
+                        ${bet.username}
+                        (${Number(bet.points).toLocaleString()})
+                    </span>
+
+                    <span>
+                        ${Number(bet.amount).toLocaleString()}
+                    </span>
                 </div>
             `;
         });
