@@ -8,19 +8,26 @@
     <style>
         .pagination {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 5px;
             margin-top: 15px;
             align-items: center;
+            justify-content: center;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 5px;
         }
 
         .pagination button {
-            padding: 5px 10px;
+            min-width: 36px;
+            height: 32px;
+            padding: 0 10px;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
             background: #eee;
             font-size: 13px;
+            flex-shrink: 0;
         }
 
         .pagination button.active {
