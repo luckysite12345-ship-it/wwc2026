@@ -23,47 +23,42 @@ router.get('/current-bets', async (req, res) => {
             });
         }
 
-        const meron = await pool.query(`
+        // =========================
+        // COMMON QUERY
+        // =========================
+        const query = `
             SELECT 
                 u.username,
                 b.amount,
-                u.points
-            FROM bets b
-            JOIN users u ON u.id = b.user_id
-            WHERE b.side = 'MERON'
-            AND b.is_dummy = false
-            AND u.role = 'player'
-            AND b.game_id = $1
-            ORDER BY b.created_at ASC
-        `, [gameId]);
 
-        const wala = await pool.query(`
-            SELECT 
-                u.username,
-                b.amount,
-                u.points
-            FROM bets b
-            JOIN users u ON u.id = b.user_id
-            WHERE b.side = 'WALA'
-            AND b.is_dummy = false
-            AND u.role = 'player'
-            AND b.game_id = $1
-            ORDER BY b.created_at ASC
-        `, [gameId]);
+                COALESCE(wt.balance_after, 0) AS points
 
-        const draw = await pool.query(`
-            SELECT 
-                u.username,
-                b.amount,
-                u.points
             FROM bets b
-            JOIN users u ON u.id = b.user_id
-            WHERE b.side = 'DRAW'
+
+            JOIN users u 
+                ON u.id = b.user_id
+
+            LEFT JOIN LATERAL (
+                SELECT balance_after
+                FROM wallet_transactions wt
+                WHERE wt.user_id = u.id
+                ORDER BY wt.created_at DESC
+                LIMIT 1
+            ) wt ON true
+
+            WHERE b.side = $1
             AND b.is_dummy = false
             AND u.role = 'player'
-            AND b.game_id = $1
+            AND b.game_id = $2
+
             ORDER BY b.created_at ASC
-        `, [gameId]);
+        `;
+
+        const meron = await pool.query(query, ['MERON', gameId]);
+
+        const wala = await pool.query(query, ['WALA', gameId]);
+
+        const draw = await pool.query(query, ['DRAW', gameId]);
 
         res.json({
             meron: meron.rows,
