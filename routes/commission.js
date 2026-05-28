@@ -7,7 +7,7 @@ const pool = require('../db/connection');
 // CONVERT COMMISSION API
 // ==========================
 router.post('/convert-commission', async (req, res) => {
-
+    console.log(req.body);
     const { userId, amount } = req.body;
     const currentUserId = req.session.user.id;
 

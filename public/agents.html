@@ -633,7 +633,8 @@
         // =========================
         async function confirmCommission() {
             const amount = Number(document.getElementById('commissionInput').value);
-
+            console.log("selectedAgentId:", selectedAgentId);
+            console.log("amount:", amount);
             if (!amount || amount <= 0 || amount > maxAmount) {
                 showSnackbar("Invalid amount");
                 return;
