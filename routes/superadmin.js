@@ -924,83 +924,159 @@ router.get('/game-archives', isSuperAdmin, async (req, res) => {
                     END
                 ), 0) AS draw_total,
 
-                COALESCE(
-                    (
-                        SELECT SUM(ct.amount)
-                        FROM commission_transactions ct
-                        WHERE ct.game_id = g.id
-                    ),
-                0) AS agent_commission_total,
+                CASE
+                    WHEN g.winner IN ('DRAW', 'CANCELLED')
+                    THEN 0
 
-                ROUND(
-
-                    (
-                        COALESCE(SUM(
-                            CASE
-                                WHEN u.role = 'player'
-                                THEN b.amount
-                                ELSE 0
-                            END
-                        ),0) * 0.915
-                    )
-
-                    -
-
-                    CASE
-
-                        WHEN g.winner = 'MERON'
-                        THEN
-
-                            COALESCE(SUM(
-                                CASE
-                                    WHEN u.role = 'player'
-                                    AND b.side = 'MERON'
-                                    THEN b.amount
-                                    ELSE 0
-                                END
-                            ),0)
-
-                            *
-
-                            COALESCE(
-                                g.meron_odds,
-                                g.winning_odds,
-                                0
-                            )
-
-                        WHEN g.winner = 'WALA'
-                        THEN
-
-                            COALESCE(SUM(
-                                CASE
-                                    WHEN u.role = 'player'
-                                    AND b.side = 'WALA'
-                                    THEN b.amount
-                                    ELSE 0
-                                END
-                            ),0)
-
-                            *
-
-                            COALESCE(
-                                g.wala_odds,
-                                g.winning_odds,
-                                0
-                            )
-
-                        ELSE 0
-
-                    END
-
-                    -
-
-                    COALESCE(
+                    ELSE COALESCE(
                         (
                             SELECT SUM(ct.amount)
                             FROM commission_transactions ct
                             WHERE ct.game_id = g.id
                         ),
                     0)
+                END AS agent_commission_total,
+
+                ROUND(
+
+                    CASE
+
+                        -- =========================
+                        -- CANCELLED
+                        -- =========================
+                        WHEN g.winner = 'CANCELLED'
+                        THEN 0
+
+                        -- =========================
+                        -- DRAW
+                        -- MERON/WALA refunded
+                        -- DRAW pays x8
+                        -- NO COMMISSION
+                        -- =========================
+                        WHEN g.winner = 'DRAW'
+                        THEN
+
+                            (
+                                COALESCE(SUM(
+                                    CASE
+                                        WHEN u.role = 'player'
+                                        THEN b.amount
+                                        ELSE 0
+                                    END
+                                ),0)
+                            )
+
+                            -
+
+                            (
+                                COALESCE(SUM(
+                                    CASE
+                                        WHEN u.role = 'player'
+                                        AND b.side = 'MERON'
+                                        THEN b.amount
+                                        ELSE 0
+                                    END
+                                ),0)
+
+                                +
+
+                                COALESCE(SUM(
+                                    CASE
+                                        WHEN u.role = 'player'
+                                        AND b.side = 'WALA'
+                                        THEN b.amount
+                                        ELSE 0
+                                    END
+                                ),0)
+
+                                +
+
+                                (
+                                    COALESCE(SUM(
+                                        CASE
+                                            WHEN u.role = 'player'
+                                            AND b.side = 'DRAW'
+                                            THEN b.amount
+                                            ELSE 0
+                                        END
+                                    ),0) * 8
+                                )
+                            )
+
+                        -- =========================
+                        -- NORMAL WINNER
+                        -- =========================
+                        ELSE
+
+                            (
+                                COALESCE(SUM(
+                                    CASE
+                                        WHEN u.role = 'player'
+                                        THEN b.amount
+                                        ELSE 0
+                                    END
+                                ),0) * 0.915
+                            )
+
+                            -
+
+                            CASE
+
+                                WHEN g.winner = 'MERON'
+                                THEN
+
+                                    COALESCE(SUM(
+                                        CASE
+                                            WHEN u.role = 'player'
+                                            AND b.side = 'MERON'
+                                            THEN b.amount
+                                            ELSE 0
+                                        END
+                                    ),0)
+
+                                    *
+
+                                    COALESCE(
+                                        g.meron_odds,
+                                        g.winning_odds,
+                                        0
+                                    )
+
+                                WHEN g.winner = 'WALA'
+                                THEN
+
+                                    COALESCE(SUM(
+                                        CASE
+                                            WHEN u.role = 'player'
+                                            AND b.side = 'WALA'
+                                            THEN b.amount
+                                            ELSE 0
+                                        END
+                                    ),0)
+
+                                    *
+
+                                    COALESCE(
+                                        g.wala_odds,
+                                        g.winning_odds,
+                                        0
+                                    )
+
+                                ELSE 0
+
+                            END
+
+                            -
+
+                            COALESCE(
+                                (
+                                    SELECT SUM(ct.amount)
+                                    FROM commission_transactions ct
+                                    WHERE ct.game_id = g.id
+                                ),
+                            0)
+
+                    END
 
                 ,2) AS game_earning
 
