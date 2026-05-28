@@ -13,6 +13,8 @@ router.get('/online-players', async (req, res) => {
                 points
             FROM users
             WHERE status = 'online'
+            AND role = 'player'
+            AND points > 0
             ORDER BY points DESC
         `);
 
