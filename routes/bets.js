@@ -30,7 +30,7 @@ router.get('/current-bets', async (req, res) => {
             SELECT 
                 u.username,
                 b.amount,
-
+                b.id,
                 COALESCE(wt.balance_after, 0) AS points
 
             FROM bets b
