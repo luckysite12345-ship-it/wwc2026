@@ -53,6 +53,8 @@ router.post('/convert-commission', async (req, res) => {
         console.log("BODY:", req.body);
         console.log("AVAILABLE:", available);
         console.log("AMOUNT:", amount);
+        console.log("Commission:", available);
+        console.log("Requested:", amount);
         // ✅ Validate amount
         if (!amount || amount <= 0 || amount > available) {
 
