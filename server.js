@@ -19,6 +19,7 @@ const authRoutes = require('./routes/auth');
 const agentsRoutes = require('./routes/agents');
 const commissionLogsRoutes = require('./routes/commissionLogs');
 const onlinePlayersRoutes = require('./routes/onlinePlayers');
+const commissionRoutes = require('./routes/commission');
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 15 minutes
   max: 5, // allow max 5 attempts per window per IP
@@ -434,6 +435,7 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api', agentsRoutes);
 app.use('/api', commissionLogsRoutes);
 app.use('/api', onlinePlayersRoutes);
+app.use('/api', isAuthenticated, commissionRoutes);
 // ==========================
 // AUTH MIDDLEWARE
 // ==========================
@@ -932,97 +934,7 @@ app.post('/api/update-commission', isAuthenticated, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-// ==========================
-// CONVERT COMMISSION API (ADMIN ONLY)
-// ==========================
-app.post('/api/convert-commission', isAuthenticated, async (req, res) => {
-  const { userId, amount } = req.body;
-  const currentUserId = req.session.user.id;
-  const client = await pool.connect();
-  try {
-    const user = await pool.query(
-      'SELECT commission_earnings, parent_id FROM users WHERE id=$1',
-      [userId]
-    );
 
-    if (user.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (Number(user.rows[0].parent_id) !== Number(currentUserId)) {
-      return res.status(403).json({ error: "Not allowed" });
-    }
-
-    const available = Number(user.rows[0].commission_earnings);
-
-    if (amount <= 0 || amount > available) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    await pool.query('BEGIN');
-
-    // ==========================
-        // UPDATE USER BALANCE
-        // ==========================
-        const updated =
-            await client.query(
-
-                `
-                UPDATE users
-                SET
-                    points = points + $1,
-                    commission_earnings =
-                        commission_earnings - $1
-                WHERE id=$2
-                RETURNING points
-                `,
-
-                [amount, userId]
-
-            );
-
-        const newBalance =
-            updated.rows[0].points;
-
-        // ==========================
-        // INSERT WALLET TRANSACTION
-        // ==========================
-        await client.query(
-
-            `
-            INSERT INTO wallet_transactions
-            (
-                user_id,
-                type,
-                amount,
-                balance_after,
-                description
-            )
-            VALUES
-            ($1, $2, $3, $4, $5)
-            `,
-
-            [
-                userId,
-                'credit',
-                amount,
-                newBalance,
-                'Commission converted to points'
-            ]
-
-        );
-
-
-    await pool.query('COMMIT');
-
-    res.json({ message: "Commission converted" });
-
-  } catch (err) {
-    await pool.query('ROLLBACK');
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 // ==========================
 // WITHDRAW POINTS API (ADMIN ONLY)
 // ==========================
