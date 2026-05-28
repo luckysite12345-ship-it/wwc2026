@@ -124,12 +124,58 @@ button:disabled {
         <iframe id="videoFrame" width="100%" height="100%" frameborder="0" scrolling="no" allowfullscreen="true"></iframe>
     </div>
     <marquee id="announcement" style="
-    margin-top:5px;
-    color:#facc15;
-    font-weight:bold;
-">
-    Welcome to SWC888
-</marquee>
+        margin-top:5px;
+        color:#facc15;
+        font-weight:bold;
+    ">
+        Welcome to SWC888
+    </marquee>
+    <!-- ONLINE PLAYERS -->
+    <div class="online-players-card" style="
+        margin-top:10px;
+        background:#0f172a;
+        border-radius:10px;
+        padding:10px;
+        max-height:300px;
+        overflow-y:auto;
+    ">
+        <div style="
+            font-weight:bold;
+            color:#22c55e;
+            margin-bottom:10px;
+            text-align:center;
+        ">
+            ONLINE PLAYERS
+        </div>
+
+        <table style="
+            width:100%;
+            border-collapse:collapse;
+            font-size:14px;
+        ">
+            <thead>
+                <tr style="
+                    background:#1e293b;
+                    color:#14b8a6;
+                ">
+                    <th style="padding:8px; text-align:left;">USERNAME</th>
+                    <th style="padding:8px; text-align:right;">POINTS</th>
+                </tr>
+            </thead>
+
+            <tbody id="onlinePlayersBody">
+                <tr>
+                    <td colspan="2" style="
+                        text-align:center;
+                        padding:10px;
+                        color:#94a3b8;
+                    ">
+                        Loading players...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <!-- BETTING / CONTROL -->
@@ -399,7 +445,7 @@ button:disabled {
                     if (msg.payload?.bets) {
                         renderBets(msg.payload.bets);
                     }
-
+                    fetchOnlinePlayers();
                     break;
 
                 case "EVENT_UPDATE":
@@ -1102,10 +1148,65 @@ button:disabled {
             console.error("Failed to fetch bets:", err);
         }
     }
+    async function fetchOnlinePlayers() {
+        try {
+
+            const res = await fetch('/api/online-players', {
+                credentials: 'include'
+            });
+
+            const data = await res.json();
+
+            const tbody = document.getElementById('onlinePlayersBody');
+
+            tbody.innerHTML = '';
+
+            if (!data.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="2" style="
+                            text-align:center;
+                            padding:10px;
+                            color:#94a3b8;
+                        ">
+                            No online players
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            data.forEach(player => {
+
+                tbody.innerHTML += `
+                    <tr style="border-bottom:1px solid #1e293b;">
+                        <td style="padding:8px;">
+                            ${player.username}
+                        </td>
+
+                        <td style="
+                            padding:8px;
+                            text-align:right;
+                            color:#22c55e;
+                            font-weight:bold;
+                        ">
+                            ${Number(player.points).toLocaleString(undefined,{
+                                minimumFractionDigits:2,
+                                maximumFractionDigits:2
+                            })}
+                        </td>
+                    </tr>
+                `;
+            });
+
+        } catch(err) {
+            console.error("Failed to fetch online players:", err);
+        }
+    }
     fetchGame();
     fetchEvent();
     fetchBets();
-    
+    fetchOnlinePlayers();
    
 
 </script>
