@@ -158,7 +158,7 @@ router.post('/remove-bet', async (req, res) => {
             Number(walletQuery.rows[0]?.balance || 0);
 
         const newBalance =
-            currentBalance + Number(bet.amount);
+            currentBalance + 0;
 
         // ✅ CREDIT REFUND
         await client.query(`
@@ -172,9 +172,9 @@ router.post('/remove-bet', async (req, res) => {
             VALUES ($1,'credit',$2,$3,$4)
         `, [
             bet.user_id,
-            bet.amount,
+            0,
             newBalance,
-            `Bet removed refund - Bet ID ${bet.id}`
+            `Bet removed duplicate - Bet ID ${bet.id}`
         ]);
 
         // ✅ DELETE COMMISSION REFERENCES FIRST
