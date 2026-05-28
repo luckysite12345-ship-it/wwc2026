@@ -135,55 +135,21 @@ router.post('/remove-bet', async (req, res) => {
         `, [betId]);
 
         if (!betQuery.rows.length) {
-
             await client.query('ROLLBACK');
-
-            return res.status(404).json({
-                error:'Bet not found'
-            });
+            return res.status(404).json({ error: 'Bet not found' });
         }
 
         const bet = betQuery.rows[0];
 
-        // ✅ REFUND USER
-        const walletQuery = await client.query(`
-            SELECT COALESCE(balance_after,0) AS balance
-            FROM wallet_transactions
-            WHERE user_id = $1
-            ORDER BY created_at DESC
-            LIMIT 1
-        `, [bet.user_id]);
+        // ❌ NO wallet refund here
 
-        const currentBalance =
-            Number(walletQuery.rows[0]?.balance || 0);
-
-        const newBalance =
-            currentBalance + Number(bet.amount);
-
-        // ✅ CREDIT REFUND
-        await client.query(`
-            INSERT INTO wallet_transactions (
-                user_id,
-                type,
-                amount,
-                balance_after,
-                description
-            )
-            VALUES ($1,'credit',$2,$3,$4)
-        `, [
-            bet.user_id,
-            bet.amount,
-            newBalance,
-            `Bet removed refund - Bet ID ${bet.id}`
-        ]);
-
-        // ✅ DELETE COMMISSION REFERENCES FIRST
+        // remove commissions linked to bet
         await client.query(`
             DELETE FROM commission_transactions
             WHERE bet_id = $1
         `, [bet.id]);
 
-        // ✅ DELETE BET
+        // delete bet only (cleanup duplicate)
         await client.query(`
             DELETE FROM bets
             WHERE id = $1
@@ -192,17 +158,15 @@ router.post('/remove-bet', async (req, res) => {
         await client.query('COMMIT');
 
         res.json({
-            success:true
+            success: true
         });
 
-    } catch(err){
-
+    } catch (err) {
         await client.query('ROLLBACK');
-
         console.error(err);
 
         res.status(500).json({
-            error:'Failed to remove bet'
+            error: 'Failed to remove duplicate bet'
         });
 
     } finally {

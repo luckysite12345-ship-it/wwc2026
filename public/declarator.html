@@ -328,7 +328,7 @@ button:disabled {
 <div id="removeBetModal" class="modal">
     <div class="modal-content" style="width:90%; max-width:500px;">
 
-        <h3>Remove Bet</h3>
+        <h3>Remove Duplicate Bet</h3>
 
         <div id="removeBetInfo" style="
             margin-bottom:15px;
@@ -383,7 +383,7 @@ button:disabled {
             </table>
         </div>
 
-        <button onclick="confirmRemoveBet()" style="
+        <button onclick="confirmRemoveDuplicateBet()" style="
             background:#dc2626;
             color:white;
             border:none;
@@ -1067,7 +1067,7 @@ button:disabled {
                     </span>
                     <button 
                             class="remove-bet-btn"
-                            onclick="openRemoveBetModal(${bet.id}, '${bet.username}', ${bet.amount})"
+                            onclick="openDuplicateBetModal(${bet.id}, '${bet.username}', ${bet.amount})"
                         >
                             X
                         </button>
