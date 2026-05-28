@@ -5,6 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Commission Logs</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .pagination {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 15px;
+            align-items: center;
+        }
+
+        .pagination button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #eee;
+            font-size: 13px;
+        }
+
+        .pagination button.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 
 <body class="dashboard-body">
@@ -67,6 +95,7 @@
                     <tbody></tbody>
                 </table>
             </div>
+            <div class="pagination" id="pagination"></div>
         </div>
 
         <footer>
@@ -226,8 +255,14 @@
                 loadCommissionLogs();
             }, 400);
         }
-        async function loadCommissionLogs() {
+        let currentPage = 1;
+
+        async function loadCommissionLogs(page = 1) {
+
             try {
+
+                currentPage = page;
+
                 const search = (document.getElementById('search')?.value || '').trim();
                 const from = document.getElementById('from')?.value || '';
                 const to = document.getElementById('to')?.value || '';
@@ -236,7 +271,8 @@
                     search,
                     from,
                     to,
-                    limit: 100
+                    page,
+                    limit: 20
                 });
 
                 const res = await fetch(`/api/my-commission-transactions?${params}`, {
@@ -248,11 +284,14 @@
                     return;
                 }
 
-                const data = await res.json();
+                const result = await res.json();
+
                 const tbody = document.querySelector('#walletTable tbody');
+
                 tbody.innerHTML = '';
 
-                data.forEach(tx => {
+                result.data.forEach(tx => {
+
                     const row = document.createElement('tr');
 
                     row.innerHTML = `
@@ -268,9 +307,77 @@
                     tbody.appendChild(row);
                 });
 
+                renderPagination(result.pagination);
+
             } catch (err) {
+
                 console.error(err);
             }
+        }
+        // =========================
+        // Render pagination buttons
+        // =========================
+        function renderPagination(pagination) {
+
+            const container = document.getElementById('pagination');
+
+            container.innerHTML = '';
+
+            const {
+                currentPage,
+                totalPages
+            } = pagination;
+
+            // FIRST
+            const firstBtn = document.createElement('button');
+            firstBtn.textContent = 'First';
+            firstBtn.disabled = currentPage === 1;
+            firstBtn.onclick = () => loadCommissionLogs(1);
+
+            container.appendChild(firstBtn);
+
+            // PREVIOUS
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = 'Prev';
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.onclick = () => loadCommissionLogs(currentPage - 1);
+
+            container.appendChild(prevBtn);
+
+            // PAGE NUMBERS
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+
+                const pageBtn = document.createElement('button');
+
+                pageBtn.textContent = i;
+
+                if (i === currentPage) {
+                    pageBtn.classList.add('active');
+                }
+
+                pageBtn.onclick = () => loadCommissionLogs(i);
+
+                container.appendChild(pageBtn);
+            }
+
+            // NEXT
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = 'Next';
+            nextBtn.disabled = currentPage === totalPages || totalPages === 0;
+            nextBtn.onclick = () => loadCommissionLogs(currentPage + 1);
+
+            container.appendChild(nextBtn);
+
+            // LAST
+            const lastBtn = document.createElement('button');
+            lastBtn.textContent = 'Last';
+            lastBtn.disabled = currentPage === totalPages || totalPages === 0;
+            lastBtn.onclick = () => loadCommissionLogs(totalPages);
+
+            container.appendChild(lastBtn);
         }
         //Code for logout
         async function logout() {

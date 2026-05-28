@@ -17,6 +17,7 @@ const { initWebSocket, broadcast } = require('./websocket');
 const betsRoutes = require('./routes/bets');
 const authRoutes = require('./routes/auth');
 const agentsRoutes = require('./routes/agents');
+const commissionLogsRoutes = require('./routes/commissionLogs');
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 15 minutes
   max: 5, // allow max 5 attempts per window per IP
@@ -430,6 +431,7 @@ app.use(session({
 app.use('/api', authRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api', agentsRoutes);
+app.use('/api', commissionLogsRoutes);
 // ==========================
 // AUTH MIDDLEWARE
 // ==========================
@@ -2182,93 +2184,7 @@ app.post('/api/promote-user', isAuthenticated, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-// ==========================
-// COMMISSION TRANSACTIONS API (SEARCHABLE)
-// ==========================
-app.get('/api/my-commission-transactions', isAuthenticated, async (req, res) => {
-  try {
-    const userId = req.session.user.id;
-    const role = req.session.user.role;
 
-    const {
-      search = '',
-      from,
-      to,
-      limit = 50
-    } = req.query;
-
-    let query = `
-      SELECT 
-        ct.id,
-        ct.amount,
-        ct.rate,
-        ct.level,
-        ct.base_amount,
-        ct.created_at,
-        u.username AS source_username,
-        g.fight_number AS game_fight
-      FROM commission_transactions ct
-      LEFT JOIN users u ON u.id = ct.source_user_id
-      LEFT JOIN games g ON g.id = ct.game_id
-    `;
-
-    const params = [];
-    let i = 1;
-
-    // ==========================
-    // 🔥 BASE FILTER (NOW INCLUDES STATUS)
-    // ==========================
-    if (role !== '-1') {
-      query += ` WHERE ct.user_id = $${i} AND ct.status = 0`;
-      params.push(userId);
-      i++;
-    } else {
-      query += ` WHERE ct.status = 0`;
-    }
-
-    // ==========================
-    // 🔍 SEARCH
-    // ==========================
-    if (search) {
-      query += ` AND (
-        u.username ILIKE $${i} 
-        OR CAST(g.fight_number AS TEXT) ILIKE $${i}
-      )`;
-      params.push(`%${search}%`);
-      i++;
-    }
-
-    // ==========================
-    // 📅 DATE FILTERS
-    // ==========================
-    if (from) {
-      query += ` AND ct.created_at >= $${i}`;
-      params.push(from);
-      i++;
-    }
-
-    if (to) {
-      query += ` AND ct.created_at <= $${i}`;
-      params.push(to);
-      i++;
-    }
-
-    query += `
-      ORDER BY ct.created_at DESC
-      LIMIT $${i}
-    `;
-
-    params.push(limit);
-
-    const result = await pool.query(query, params);
-
-    res.json(result.rows);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
 // ==========================
 // START SERVER
 // ==========================
