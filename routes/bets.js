@@ -74,5 +74,139 @@ router.get('/current-bets', async (req, res) => {
         });
     }
 });
+router.get('/bet-wallet-history/:betId', async (req, res) => {
 
+    try {
+
+        const { betId } = req.params;
+
+        const betQuery = await pool.query(`
+            SELECT user_id
+            FROM bets
+            WHERE id = $1
+        `, [betId]);
+
+        if (!betQuery.rows.length) {
+            return res.status(404).json({
+                error:'Bet not found'
+            });
+        }
+
+        const userId = betQuery.rows[0].user_id;
+
+        const history = await pool.query(`
+            SELECT
+                type,
+                amount,
+                balance_after,
+                description,
+                created_at
+            FROM wallet_transactions
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT 10
+        `, [userId]);
+
+        res.json(history.rows);
+
+    } catch(err){
+        console.error(err);
+
+        res.status(500).json({
+            error:'Failed to fetch wallet history'
+        });
+    }
+});
+router.post('/remove-bet', async (req, res) => {
+
+    const client = await pool.connect();
+
+    try {
+
+        await client.query('BEGIN');
+
+        const { betId } = req.body;
+
+        const betQuery = await client.query(`
+            SELECT *
+            FROM bets
+            WHERE id = $1
+            FOR UPDATE
+        `, [betId]);
+
+        if (!betQuery.rows.length) {
+
+            await client.query('ROLLBACK');
+
+            return res.status(404).json({
+                error:'Bet not found'
+            });
+        }
+
+        const bet = betQuery.rows[0];
+
+        // ✅ REFUND USER
+        const walletQuery = await client.query(`
+            SELECT COALESCE(balance_after,0) AS balance
+            FROM wallet_transactions
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT 1
+        `, [bet.user_id]);
+
+        const currentBalance =
+            Number(walletQuery.rows[0]?.balance || 0);
+
+        const newBalance =
+            currentBalance + Number(bet.amount);
+
+        // ✅ CREDIT REFUND
+        await client.query(`
+            INSERT INTO wallet_transactions (
+                user_id,
+                type,
+                amount,
+                balance_after,
+                description
+            )
+            VALUES ($1,'credit',$2,$3,$4)
+        `, [
+            bet.user_id,
+            bet.amount,
+            newBalance,
+            `Bet removed refund - Bet ID ${bet.id}`
+        ]);
+
+        // ✅ DELETE COMMISSION REFERENCES FIRST
+        await client.query(`
+            DELETE FROM commission_transactions
+            WHERE bet_id = $1
+        `, [bet.id]);
+
+        // ✅ DELETE BET
+        await client.query(`
+            DELETE FROM bets
+            WHERE id = $1
+        `, [bet.id]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success:true
+        });
+
+    } catch(err){
+
+        await client.query('ROLLBACK');
+
+        console.error(err);
+
+        res.status(500).json({
+            error:'Failed to remove bet'
+        });
+
+    } finally {
+        client.release();
+    }
+});
 module.exports = router;

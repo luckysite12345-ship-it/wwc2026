@@ -946,3 +946,17 @@ button:disabled {
     color: #f87171; /* slight red tone */
 }
 
+.remove-bet-btn{
+    background:#dc2626;
+    color:#fff;
+    border:none;
+    padding:4px 8px;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:12px;
+    font-weight:bold;
+}
+
+.remove-bet-btn:hover{
+    background:#b91c1c;
+}

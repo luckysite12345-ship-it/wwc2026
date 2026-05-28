@@ -324,6 +324,87 @@ button:disabled {
         <button onclick="closeBetModal()">Cancel</button>
     </div>
 </div>
+<!-- REMOVE BET MODAL -->
+<div id="removeBetModal" class="modal">
+    <div class="modal-content" style="width:90%; max-width:500px;">
+
+        <h3>Remove Bet</h3>
+
+        <div id="removeBetInfo" style="
+            margin-bottom:15px;
+            font-size:14px;
+            color:#f8fafc;
+        ">
+        </div>
+
+        <div style="
+            background:#0f172a;
+            border-radius:10px;
+            padding:10px;
+            max-height:250px;
+            overflow-y:auto;
+            margin-bottom:15px;
+        ">
+            <table style="
+                width:100%;
+                border-collapse:collapse;
+                font-size:13px;
+            ">
+                <thead>
+                    <tr style="
+                        background:#1e293b;
+                        color:#14b8a6;
+                    ">
+                        <th style="padding:8px; text-align:left;">
+                            TYPE
+                        </th>
+
+                        <th style="padding:8px; text-align:right;">
+                            AMOUNT
+                        </th>
+
+                        <th style="padding:8px; text-align:right;">
+                            BALANCE
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody id="walletHistoryBody">
+                    <tr>
+                        <td colspan="3" style="
+                            text-align:center;
+                            padding:10px;
+                            color:#94a3b8;
+                        ">
+                            Loading...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button onclick="confirmRemoveBet()" style="
+            background:#dc2626;
+            color:white;
+            border:none;
+            padding:10px 15px;
+            border-radius:8px;
+            font-weight:bold;
+            cursor:pointer;
+        ">
+            CONFIRM REMOVE
+        </button>
+
+        <button onclick="closeRemoveBetModal()" style="
+            margin-left:10px;
+            padding:10px 15px;
+            border-radius:8px;
+        ">
+            CANCEL
+        </button>
+
+    </div>
+</div>
 <script>
     let lastBetCount = 0;
     let frozenMeronOdds = null;
@@ -982,12 +1063,18 @@ button:disabled {
                 <div class="bet-item">
                     <span>
                         ${bet.username}
-                        (${Number(bet.id).toLocaleString()})
+                        
                     </span>
 
                     <span>
                         ${Number(bet.amount).toLocaleString()}
                     </span>
+                    <button 
+                            class="remove-bet-btn"
+                            onclick="openRemoveBetModal(${bet.id}, '${bet.username}', ${bet.amount})"
+                        >
+                            REMOVE
+                        </button>
                 </div>
             `;
         });
@@ -998,12 +1085,18 @@ button:disabled {
                 <div class="bet-item">
                     <span>
                         ${bet.username}
-                        (${Number(bet.id).toLocaleString()})
+                        
                     </span>
 
                     <span>
                         ${Number(bet.amount).toLocaleString()}
                     </span>
+                    <button 
+                            class="remove-bet-btn"
+                            onclick="openRemoveBetModal(${bet.id}, '${bet.username}', ${bet.amount})"
+                        >
+                            REMOVE
+                        </button>
                 </div>
             `;
         });
@@ -1014,12 +1107,18 @@ button:disabled {
                 <div class="bet-item">
                     <span>
                         ${bet.username}
-                        (${Number(bet.id).toLocaleString()})
+                        
                     </span>
 
                     <span>
                         ${Number(bet.amount).toLocaleString()}
                     </span>
+                    <button 
+                            class="remove-bet-btn"
+                            onclick="openRemoveBetModal(${bet.id}, '${bet.username}', ${bet.amount})"
+                        >
+                            REMOVE
+                        </button>
                 </div>
             `;
         });
@@ -1203,6 +1302,128 @@ button:disabled {
             console.error("Failed to fetch online players:", err);
         }
     }
+    let removeBetData = {
+        betId: null
+    };
+    async function openRemoveBetModal(betId, username, amount){
+
+    removeBetData.betId = betId;
+
+    document.getElementById('removeBetModal').style.display = 'flex';
+
+    document.getElementById('removeBetInfo').innerHTML = `
+        <b>Player:</b> ${username}<br>
+        <b>Bet Amount:</b> ${Number(amount).toLocaleString()}
+    `;
+
+    try {
+
+        const res = await fetch(`/api/bet-wallet-history/${betId}`, {
+            credentials:'include'
+        });
+
+        const data = await res.json();
+
+        const tbody = document.getElementById('walletHistoryBody');
+
+        tbody.innerHTML = '';
+
+        if (!data.length) {
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" style="
+                        text-align:center;
+                        padding:10px;
+                        color:#94a3b8;
+                    ">
+                        No wallet history
+                    </td>
+                </tr>
+            `;
+
+            return;
+        }
+
+        data.forEach(tx => {
+
+            tbody.innerHTML += `
+                <tr style="border-bottom:1px solid #1e293b;">
+
+                    <td style="padding:8px;">
+                        ${tx.type}
+                    </td>
+
+                    <td style="
+                        padding:8px;
+                        text-align:right;
+                    ">
+                        ${Number(tx.amount).toLocaleString(undefined,{
+                            minimumFractionDigits:2,
+                            maximumFractionDigits:2
+                        })}
+                    </td>
+
+                    <td style="
+                        padding:8px;
+                        text-align:right;
+                        color:#22c55e;
+                        font-weight:bold;
+                    ">
+                        ${Number(tx.balance_after).toLocaleString(undefined,{
+                            minimumFractionDigits:2,
+                            maximumFractionDigits:2
+                        })}
+                    </td>
+
+                </tr>
+            `;
+        });
+
+    } catch(err){
+        console.error(err);
+    }
+}
+
+function closeRemoveBetModal(){
+    document.getElementById('removeBetModal').style.display = 'none';
+}
+
+async function confirmRemoveBet(){
+
+    if (!removeBetData.betId) return;
+
+    try {
+
+        const res = await fetch('/api/remove-bet', {
+            method:'POST',
+            credentials:'include',
+            headers:{
+                'Content-Type':'application/json'
+            },
+            body: JSON.stringify({
+                betId: removeBetData.betId
+            })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            return showSnackbar(data.error || "Failed to remove bet", "error");
+        }
+
+        showSnackbar("Bet removed successfully");
+
+        closeRemoveBetModal();
+
+        fetchBets();
+        fetchGame();
+
+    } catch(err){
+        console.error(err);
+        showSnackbar("Server error", "error");
+    }
+}
     fetchGame();
     fetchEvent();
     fetchBets();
