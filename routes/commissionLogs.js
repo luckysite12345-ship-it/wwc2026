@@ -6,6 +6,7 @@ const pool = require('../db/connection');
 // Middleware
 // ==========================
 function isAuthenticated(req, res, next) {
+
     if (!req.session.user) {
         return res.status(401).json({
             error: 'Unauthorized'
@@ -16,7 +17,7 @@ function isAuthenticated(req, res, next) {
 }
 
 // ==========================
-// COMMISSION TRANSACTIONS API
+// COMMISSION LOGS
 // ==========================
 router.get('/my-commission-transactions', isAuthenticated, async (req, res) => {
 
@@ -30,23 +31,32 @@ router.get('/my-commission-transactions', isAuthenticated, async (req, res) => {
             from,
             to,
             page = 1,
-            limit = 20
+            limit = 25
         } = req.query;
 
         const currentPage = parseInt(page);
         const pageLimit = parseInt(limit);
+
         const offset = (currentPage - 1) * pageLimit;
 
-        let whereClause = `WHERE ct.status = 0`;
         const params = [];
         let i = 1;
+
+        let whereClause = `WHERE 1=1`;
 
         // ==========================
         // USER FILTER
         // ==========================
+        // TEMPORARY REMOVE status=0
+        // because it may be hiding records
+        // ==========================
+
         if (role !== '-1') {
+
             whereClause += ` AND ct.user_id = $${i}`;
+
             params.push(userId);
+
             i++;
         }
 
@@ -54,6 +64,7 @@ router.get('/my-commission-transactions', isAuthenticated, async (req, res) => {
         // SEARCH
         // ==========================
         if (search) {
+
             whereClause += `
                 AND (
                     u.username ILIKE $${i}
@@ -62,29 +73,33 @@ router.get('/my-commission-transactions', isAuthenticated, async (req, res) => {
             `;
 
             params.push(`%${search}%`);
+
             i++;
         }
 
         // ==========================
-        // FROM DATE
+        // DATE FILTERS
         // ==========================
         if (from) {
+
             whereClause += ` AND DATE(ct.created_at) >= $${i}`;
+
             params.push(from);
+
             i++;
         }
 
-        // ==========================
-        // TO DATE
-        // ==========================
         if (to) {
+
             whereClause += ` AND DATE(ct.created_at) <= $${i}`;
+
             params.push(to);
+
             i++;
         }
 
         // ==========================
-        // TOTAL COUNT
+        // COUNT QUERY
         // ==========================
         const countQuery = `
             SELECT COUNT(*) AS total
@@ -95,7 +110,9 @@ router.get('/my-commission-transactions', isAuthenticated, async (req, res) => {
         `;
 
         const countResult = await pool.query(countQuery, params);
+
         const totalRecords = parseInt(countResult.rows[0].total);
+
         const totalPages = Math.ceil(totalRecords / pageLimit);
 
         // ==========================
@@ -120,9 +137,18 @@ router.get('/my-commission-transactions', isAuthenticated, async (req, res) => {
             OFFSET $${i + 1}
         `;
 
-        const finalParams = [...params, pageLimit, offset];
+        const finalParams = [
+            ...params,
+            pageLimit,
+            offset
+        ];
+
+        console.log('QUERY:', query);
+        console.log('PARAMS:', finalParams);
 
         const result = await pool.query(query, finalParams);
+
+        console.log('ROWS:', result.rows.length);
 
         res.json({
             data: result.rows,
@@ -136,7 +162,7 @@ router.get('/my-commission-transactions', isAuthenticated, async (req, res) => {
 
     } catch (err) {
 
-        console.error(err);
+        console.error('COMMISSION LOG ERROR:', err);
 
         res.status(500).json({
             error: 'Server error'

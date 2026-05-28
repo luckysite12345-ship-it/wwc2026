@@ -77,6 +77,11 @@
                 <input type="text" id="search" placeholder="Search username / fight #" oninput="debouncedLoad()">
                 <input type="date" id="from" onchange="loadCommissionLogs()">
                 <input type="date" id="to" onchange="loadCommissionLogs()">
+                <select id="limit" onchange="loadCommissionLogs(1)">
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
                 <button onclick="loadCommissionLogs()">Search</button>
             </div>
             <div class="table-wrapper">
@@ -272,7 +277,7 @@
                     from,
                     to,
                     page,
-                    limit: 20
+                    limit: document.getElementById('limit').value
                 });
 
                 const res = await fetch(`/api/my-commission-transactions?${params}`, {
