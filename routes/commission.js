@@ -50,7 +50,9 @@ router.post('/convert-commission', async (req, res) => {
         }
 
         const available = Number(user.commission_earnings);
-
+        console.log("BODY:", req.body);
+        console.log("AVAILABLE:", available);
+        console.log("AMOUNT:", amount);
         // ✅ Validate amount
         if (!amount || amount <= 0 || amount > available) {
 
