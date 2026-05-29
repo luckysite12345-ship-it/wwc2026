@@ -593,8 +593,8 @@
             }
 
             const endpoint = actionType === 'convert'
-                ? '/api/convert-commission'
-                : '/api/withdraw-points';
+                ? '/api/superadmin/convert-commission'
+                : '/api/superadmin/withdraw-commission';
 
             const res = await fetch(endpoint, {
                 method: 'POST',
