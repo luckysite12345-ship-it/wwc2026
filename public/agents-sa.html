@@ -89,7 +89,7 @@
         <div id="pointsModal" class="modal">
             <div class="modal-content">
                 <h3>Add Points</h3>
-                <input type="number" id="pointsInput" placeholder="Enter amount">
+                <input type="number" id="pointsInput" placeholder="Enter amount" style="width:100%; padding:8px; margin:10px 0;">
                 <button onclick="confirmAddPoints()">Confirm</button>
                 <button onclick="closeModal()">Cancel</button>
             </div>
@@ -99,7 +99,7 @@
             <div class="modal-content">
                 <h3 id="modalTitle"></h3>
                 <p>Available: <span id="availableAmount">0</span></p>
-                <input type="number" id="commissionInput" placeholder="Enter amount">
+                <input type="number" id="commissionInput" placeholder="Enter amount" style="width:100%; padding:8px; margin:10px 0;">
                 <button onclick="confirmCommission()">Confirm</button>
                 <button onclick="closeCommissionModal()">Cancel</button>
             </div>
@@ -421,7 +421,7 @@
 
                 const res = await fetch('/api/agents', { credentials: 'include' });
                 let agents = await res.json();
-                
+
                 // Default = hide admin & declarator
                 if (!showAllAccounts) {
                     agents = agents.filter(a =>
