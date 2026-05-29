@@ -6,7 +6,7 @@ console.log('agents.js loaded');
 // ==========================
 // CONVERT COMMISSION
 // ==========================
-router.post('/convert-commission', async (req, res) => {
+/*router.post('/convert-commission', async (req, res) => {
 
     if (!req.session.user) {
         return res.status(401).json({
@@ -164,7 +164,7 @@ router.post('/convert-commission', async (req, res) => {
     } finally {
         client.release();
     }
-});
+});*/
 
 function buildTree(rows, rootId) {
     const map = {};
