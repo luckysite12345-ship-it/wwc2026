@@ -317,7 +317,7 @@
         async function toggleStatus(userId, currentStatus) {
             const newStatus = currentStatus === 'suspended' ? 'offline' : 'suspended';
 
-            await fetch('/api/update-status', {
+            await fetch('/api/superadmin/toggle-status', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -364,7 +364,7 @@
                 return;
             }
 
-            const res = await fetch('/api/add-points', {
+            const res = await fetch('/api/superadmin/add-points', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -497,7 +497,7 @@
         // Update commission rate
         // =========================
         async function updateCommission(userId, rate) {
-            const res = await fetch('/api/update-commission', {
+            const res = await fetch('/api/superadmin/update-commission', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -519,7 +519,7 @@
         // Convert commission to points
         // =========================
         async function convertCommission(userId) {
-            const res = await fetch('/api/convert-commission', {
+            const res = await fetch('/api/superadmin/convert-commission', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -540,7 +540,7 @@
         // Withdraw commission
         // =========================
         async function withdrawCommission(userId) {
-            const res = await fetch('/api/withdraw-points', {
+            const res = await fetch('/api/superadmin/withdraw-load', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
