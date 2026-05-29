@@ -8,7 +8,8 @@ const pool = require('../db/connection');
 // ==========================
 router.post('/convert-commission', async (req, res) => {
     console.log(req.body);
-    const { userId, amount } = req.body;
+    const userId = Number(req.body.userId);
+    const amount = Number(req.body.amount);
     const currentUserId = req.session.user.id;
 
     const client = await pool.connect();
@@ -38,7 +39,9 @@ router.post('/convert-commission', async (req, res) => {
         }
 
         const user = userQuery.rows[0];
-
+        console.log("SESSION USER:", req.session.user);
+        console.log("CURRENT USER:", currentUserId);
+        console.log("PARENT ID:", user.parent_id);
         // ✅ Check ownership
         if (Number(user.parent_id) !== Number(currentUserId)) {
 
@@ -54,7 +57,7 @@ router.post('/convert-commission', async (req, res) => {
         console.log("Commission:", available);
         console.log("Requested:", amount);
         // ✅ Validate amount
-        if (!amount || amount <= 0 || amount > available) {
+        if (isNaN(amount) || amount <= 0 || amount > available) {
 
             await client.query('ROLLBACK');
 
