@@ -885,19 +885,26 @@ app.post('/api/convert-commission', async (req, res) => {
 
         await client.query('BEGIN');
 
-        // ✅ GET TARGET USER
-        const userQuery = await client.query(
-            `
+        const allUsers = await client.query(`
+            SELECT id, username
+            FROM users
+            ORDER BY id
+        `);
+
+        console.log("ALL USERS:", allUsers.rows);
+
+        const userQuery = await client.query(`
             SELECT
                 id,
+                username,
                 points,
                 commission_earnings,
                 parent_id
             FROM users
             WHERE id = $1
-            `,
-            [userId]
-        );
+        `, [userId]);
+
+        console.log("FOUND USER:", userQuery.rows);
         console.log("RAW BODY:", req.body);
         console.log("USER ID TYPE:", typeof userId);
         console.log("USER ID VALUE:", userId);
