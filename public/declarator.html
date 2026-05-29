@@ -1057,6 +1057,11 @@ button:disabled {
         walaDiv.innerHTML = '';
         drawDiv.innerHTML = '';
 
+        // ✅ SAFE DEFAULTS
+        const meron = data?.meron || [];
+        const wala = data?.wala || [];
+        const draw = data?.draw || [];
+        
         data.meron.forEach(bet => {
 
             meronDiv.innerHTML += `
