@@ -657,7 +657,8 @@
             const data = await res.json();
 
             if (!res.ok) {
-                showSnackbar(data.error);
+                console.log("BACKEND ERROR:", data);
+                showSnackbar(data.error || "Request failed");
                 return;
             }
 
