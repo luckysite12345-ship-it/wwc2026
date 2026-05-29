@@ -898,7 +898,9 @@ app.post('/api/convert-commission', async (req, res) => {
             `,
             [userId]
         );
-
+        console.log("RAW BODY:", req.body);
+        console.log("USER ID TYPE:", typeof userId);
+        console.log("USER ID VALUE:", userId);
         console.log("USER QUERY:", userQuery.rows);
 
         if (userQuery.rows.length === 0) {
