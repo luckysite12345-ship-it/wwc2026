@@ -1009,7 +1009,7 @@ app.get('/api/agents', isAuthenticated, async (req, res) => {
         p.username AS parent_username
       FROM users u
       LEFT JOIN users p ON u.parent_id = p.id
-      WHERE u.role IN ('master_agent', 'sub_agent', 'agent')
+      WHERE u.role IN ('master_agent', 'sub_agent', 'agent', 'declarator', 'admin')
       AND u.status NOT IN ('pending', 'rejected')
     `;
 
