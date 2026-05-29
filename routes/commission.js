@@ -7,9 +7,14 @@ const pool = require('../db/connection');
 // CONVERT COMMISSION API
 // ==========================
 router.post('/convert-commission', async (req, res) => {
+
     console.log(req.body);
+
     const userId = Number(req.body.userId);
     const amount = Number(req.body.amount);
+
+    console.log("PARSED USER ID:", userId);
+
     const currentUserId = req.session.user.id;
 
     const client = await pool.connect();
@@ -29,6 +34,8 @@ router.post('/convert-commission', async (req, res) => {
             [userId]
         );
 
+        console.log("ROWS:", userQuery.rows);
+
         if (userQuery.rows.length === 0) {
 
             await client.query('ROLLBACK');
@@ -39,10 +46,7 @@ router.post('/convert-commission', async (req, res) => {
         }
 
         const user = userQuery.rows[0];
-        console.log("SESSION USER:", req.session.user);
-        console.log("CURRENT USER:", currentUserId);
-        console.log("PARENT ID:", user.parent_id);
-        // ✅ Check ownership
+
         if (Number(user.parent_id) !== Number(currentUserId)) {
 
             await client.query('ROLLBACK');
@@ -53,10 +57,7 @@ router.post('/convert-commission', async (req, res) => {
         }
 
         const available = Number(user.commission_earnings);
-        
-        console.log("Commission:", available);
-        console.log("Requested:", amount);
-        // ✅ Validate amount
+
         if (isNaN(amount) || amount <= 0 || amount > available) {
 
             await client.query('ROLLBACK');
@@ -66,7 +67,6 @@ router.post('/convert-commission', async (req, res) => {
             });
         }
 
-        // ➖ Deduct commission
         await client.query(
             `
             UPDATE users
@@ -76,7 +76,6 @@ router.post('/convert-commission', async (req, res) => {
             [amount, userId]
         );
 
-        // ➕ Add to points
         await client.query(
             `
             UPDATE users
@@ -84,26 +83,6 @@ router.post('/convert-commission', async (req, res) => {
             WHERE id = $2
             `,
             [amount, userId]
-        );
-
-        // ✅ Optional transaction log
-        await client.query(
-            `
-            INSERT INTO commission_transactions
-            (
-                user_id,
-                amount,
-                type,
-                description
-            )
-            VALUES ($1, $2, $3, $4)
-            `,
-            [
-                userId,
-                amount,
-                'convert',
-                'Commission converted to points'
-            ]
         );
 
         await client.query('COMMIT');
