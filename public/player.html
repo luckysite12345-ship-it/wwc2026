@@ -755,6 +755,11 @@ body, html {
             return showSnackbar("Enter valid amount", "warning");
         }
 
+        // ✅ MINIMUM BET
+        if (amount < 50) {
+            return showSnackbar("Minimum bet is 50", "warning");
+        }
+
         if (amount > balance) {
             return showSnackbar("Insufficient balance", "error");
         }
