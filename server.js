@@ -435,7 +435,7 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api', agentsRoutes);
 app.use('/api', commissionLogsRoutes);
 app.use('/api', onlinePlayersRoutes);
-app.use('/api', isAuthenticated, commissionRoutes);
+app.use('/api', commissionRoutes);
 // ==========================
 // AUTH MIDDLEWARE
 // ==========================
