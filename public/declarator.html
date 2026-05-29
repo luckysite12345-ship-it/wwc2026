@@ -1062,7 +1062,7 @@ button:disabled {
         const wala = data?.wala || [];
         const draw = data?.draw || [];
         
-        data.meron.forEach(bet => {
+        meron.forEach(bet => {
 
             meronDiv.innerHTML += `
                 <div class="bet-item">
@@ -1084,7 +1084,7 @@ button:disabled {
             `;
         });
 
-        data.wala.forEach(bet => {
+        wala.forEach(bet => {
 
             walaDiv.innerHTML += `
                 <div class="bet-item">
@@ -1105,8 +1105,8 @@ button:disabled {
                 </div>
             `;
         });
-
-        data.draw.forEach(bet => {
+        
+        draw.forEach(bet => {
 
             drawDiv.innerHTML += `
                 <div class="bet-item">
