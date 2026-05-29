@@ -63,6 +63,13 @@
                     </select>
                 
                 <!-- TABLE -->
+                <div style="margin-bottom:10px;">
+                    <button id="toggleAccountsBtn"
+                        class="membership-link"
+                        onclick="toggleAllAccounts()">
+                        👁️ Show Admin & Declarator
+                    </button>
+                </div>
                 <div class="table-wrapper">
                     <table class="styled-table">
                         <thead>
@@ -247,6 +254,7 @@
         // =========================
         let selectedUserId = null;
         let currentUserId = null;
+        let showAllAccounts = false;
 
         async function loadPlayers() {
             try {
@@ -413,7 +421,14 @@
 
                 const res = await fetch('/api/agents', { credentials: 'include' });
                 let agents = await res.json();
-
+                
+                // Default = hide admin & declarator
+                if (!showAllAccounts) {
+                    agents = agents.filter(a =>
+                        a.role !== 'admin' &&
+                        a.role !== 'declarator'
+                    );
+                }
                 const roleFilter = document.getElementById('roleFilter').value;
                 const statusFilter = document.getElementById('statusFilter').value;
                 const search = document.getElementById('agentSearch').value.toLowerCase();
@@ -774,6 +789,18 @@
                 default:
                     return role || '-';
             }
+        }
+        function toggleAllAccounts() {
+
+            showAllAccounts = !showAllAccounts;
+
+            const btn = document.getElementById('toggleAccountsBtn');
+
+            btn.textContent = showAllAccounts
+                ? '🙈 Hide Admin & Declarator'
+                : '👁️ Show Admin & Declarator';
+
+            loadAgents();
         }
         // =========================
         // Init
