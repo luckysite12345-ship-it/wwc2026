@@ -19,7 +19,7 @@ const authRoutes = require('./routes/auth');
 const agentsRoutes = require('./routes/agents');
 const commissionLogsRoutes = require('./routes/commissionLogs');
 const onlinePlayersRoutes = require('./routes/onlinePlayers');
-const commissionRoutes = require('./routes/commission');
+
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 15 minutes
   max: 5, // allow max 5 attempts per window per IP
@@ -435,7 +435,7 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api', agentsRoutes);
 app.use('/api', commissionLogsRoutes);
 app.use('/api', onlinePlayersRoutes);
-app.use('/api', commissionRoutes);
+
 // ==========================
 // AUTH MIDDLEWARE
 // ==========================
@@ -843,6 +843,141 @@ app.post('/api/reset-password', isAuthenticated, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
+});
+// ==========================
+// CONVERT COMMISSION API
+// ==========================
+app.post('/api/convert-commission', async (req, res) => {
+
+    console.log("BODY:", req.body);
+
+    const userId = Number(req.body.userId);
+    const amount = Number(req.body.amount);
+
+    console.log("PARSED USER ID:", userId);
+    console.log("PARSED AMOUNT:", amount);
+
+    // ✅ VALIDATION
+    if (isNaN(userId)) {
+        return res.status(400).json({
+            error: 'Invalid user ID'
+        });
+    }
+
+    if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({
+            error: 'Invalid amount'
+        });
+    }
+
+    // ✅ SESSION CHECK
+    if (!req.session?.user) {
+        return res.status(401).json({
+            error: 'Unauthorized'
+        });
+    }
+
+    const currentUserId = req.session.user.id;
+
+    const client = await pool.connect();
+
+    try {
+
+        await client.query('BEGIN');
+
+        // ✅ GET TARGET USER
+        const userQuery = await client.query(
+            `
+            SELECT
+                id,
+                points,
+                commission_earnings,
+                parent_id
+            FROM users
+            WHERE id = $1
+            `,
+            [userId]
+        );
+
+        console.log("USER QUERY:", userQuery.rows);
+
+        if (userQuery.rows.length === 0) {
+
+            await client.query('ROLLBACK');
+
+            return res.status(404).json({
+                error: 'User not found'
+            });
+        }
+
+        const user = userQuery.rows[0];
+
+        // ✅ SECURITY CHECK
+        if (Number(user.parent_id) !== Number(currentUserId)) {
+
+            await client.query('ROLLBACK');
+
+            return res.status(403).json({
+                error: 'Not allowed'
+            });
+        }
+
+        const available = Number(user.commission_earnings);
+
+        console.log("AVAILABLE:", available);
+
+        // ✅ CHECK AVAILABLE COMMISSION
+        if (amount > available) {
+
+            await client.query('ROLLBACK');
+
+            return res.status(400).json({
+                error: 'Insufficient commission'
+            });
+        }
+
+        // ✅ DEDUCT COMMISSION
+        await client.query(
+            `
+            UPDATE users
+            SET commission_earnings = commission_earnings - $1
+            WHERE id = $2
+            `,
+            [amount, userId]
+        );
+
+        // ✅ ADD POINTS
+        await client.query(
+            `
+            UPDATE users
+            SET points = points + $1
+            WHERE id = $2
+            `,
+            [amount, userId]
+        );
+
+        await client.query('COMMIT');
+
+        res.json({
+            message: 'Commission converted successfully'
+        });
+
+    } catch (err) {
+
+        await client.query('ROLLBACK');
+
+        console.error("CONVERT ERROR:", err);
+
+        res.status(500).json({
+            error: 'Server error'
+        });
+
+    } finally {
+
+        client.release();
+
+    }
+
 });
 // ==========================
 // AGENTS LIST API
