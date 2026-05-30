@@ -241,7 +241,7 @@ router.post('/sa/promote-player', async (req, res) => {
 
         await pool.query(`
             UPDATE users
-            SET role = '1',
+            SET role = 'agent',
                 updated_at = NOW()
             WHERE id = $1
         `, [userId]);
