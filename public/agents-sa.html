@@ -83,25 +83,7 @@
                             </thead>
                         <tbody id="agentsTable"></tbody>
                     </table>
-                    
                 </div>
-                <div class="pagination-bar">
-
-                        <select id="pageSize" onchange="changePageSize()">
-                            <option value="25">25</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-
-                        <button onclick="goToFirst()">« First</button>
-                        <button onclick="goToPrev()">‹ Prev</button>
-
-                        <div id="pageNumbers" class="page-numbers"></div>
-
-                        <button onclick="goToNext()">Next ›</button>
-                        <button onclick="goToLast()">Last »</button>
-
-                    </div>
             </div>
         </div>
         <div id="pointsModal" class="modal">
@@ -144,9 +126,7 @@
             websiteName: "Website",
             websiteUrl: window.location.origin
         };
-        let currentPage = 1;
-        let pageSize = 25;
-        let filteredAgents = [];
+
         // =========================
         // Load Config
         // =========================
@@ -466,8 +446,48 @@
                     );
                 }
                 const table = document.getElementById('agentsTable');
-                filteredAgents = agents;
-                renderAgentsPage();
+                table.innerHTML = '';
+
+                agents.forEach(a => {
+
+                    const row = document.createElement('tr');
+
+                    row.innerHTML = `
+                        <td><p class="btn add">${a.username}</p></td>
+
+                        <td>
+                            <select class="action-dropdown"
+                                onchange='handleAgentAction(
+                                    this,
+                                    this.value,
+                                    ${a.id},
+                                    ${JSON.stringify(a.username)},
+                                    ${a.points || 0},
+                                    ${a.commission_earnings || 0}
+                                )'>
+
+                                <option value="">⚙️ Select Action</option>
+                                <option value="load">➕ Load</option>
+                                <option value="withdraw_load">💸 Withdraw Points</option>
+                                <option value="withdraw_commission">💰 Withdraw Commission</option>
+                                <option value="network">🌐 View Network</option>
+                            </select>
+                        </td>
+
+                        <td class="wallet-yellow">${formatPHP(a.points)}</td>
+
+                        <td class="earnings-green">${formatPHP(a.commission_earnings || 0)}</td>
+
+                        <td>
+                            CURRENT: ${a.commission_rate || 0}%<br>
+                            <input type="number" min="0" max="100"
+                                value="${a.commission_rate || 0}"
+                                onchange="updateCommission(${a.id}, this.value)">
+                        </td>
+                    `;
+
+                    table.appendChild(row);
+                });
 
             } catch (err) {
                 console.error(err);
@@ -709,72 +729,6 @@
                 currency: 'PHP'
             }).format(amount);
         }
-        function renderAgentsPage() {
-
-            const table = document.getElementById('agentsTable');
-            table.innerHTML = '';
-
-            const start = (currentPage - 1) * pageSize;
-            const end = start + pageSize;
-
-            const pageAgents = filteredAgents.slice(start, end);
-
-            pageAgents.forEach(a => {
-
-                const row = document.createElement('tr');
-
-                row.innerHTML = `
-                    YOUR EXISTING ROW HTML
-                `;
-
-                table.appendChild(row);
-            });
-
-            renderPagination();
-        }
-
-
-        // =========================
-        // PAGINATION FUNCTIONS
-        // =========================
-
-        function goToNext() {
-
-            const totalPages =
-                Math.ceil(filteredAgents.length / pageSize);
-
-            if (currentPage < totalPages) {
-
-                currentPage++;
-
-                renderAgentsPage();
-            }
-        }
-
-        function goToPrev() {
-
-            if (currentPage > 1) {
-
-                currentPage--;
-
-                renderAgentsPage();
-            }
-        }
-
-        function goToFirst() {
-
-            currentPage = 1;
-
-            renderAgentsPage();
-        }
-
-        function goToLast() {
-
-            currentPage =
-                Math.ceil(filteredAgents.length / pageSize);
-
-            renderAgentsPage();
-        }
         // =========================
         // Load withdrawal request count
         // =========================
@@ -847,34 +801,6 @@
                 : '👁️ Show Admin & Declarator';
 
             loadAgents();
-        }
-        function renderAgentsPage() {
-
-            const table =
-                document.getElementById('agentsTable');
-
-            table.innerHTML = '';
-
-            const start =
-                (currentPage - 1) * pageSize;
-
-            const end =
-                start + pageSize;
-
-            const pageAgents =
-                filteredAgents.slice(start, end);
-
-            pageAgents.forEach(a => {
-
-                const row =
-                    document.createElement('tr');
-
-                row.innerHTML = `
-                    YOUR EXISTING ROW HTML
-                `;
-
-                table.appendChild(row);
-            });
         }
         // =========================
         // Init

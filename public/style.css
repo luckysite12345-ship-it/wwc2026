@@ -960,31 +960,3 @@ button:disabled {
 .remove-bet-btn:hover{
     background:#b91c1c;
 }
-
-.pagination-bar{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:5px;
-    flex-wrap:wrap;
-    margin-top:10px;
-}
-
-.pagination-bar button{
-    padding:4px 10px;
-    font-size:12px;
-    cursor:pointer;
-}
-
-.pagination-bar button.active{
-    font-weight:bold;
-}
-
-.page-numbers{
-    display:flex;
-    gap:3px;
-}
-
-#pageSize{
-    padding:4px;
-}
