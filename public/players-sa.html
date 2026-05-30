@@ -340,7 +340,7 @@
                 return;
             }
 
-            const res = await fetch('/api/add-points', {
+            const res = await fetch('/api/sa/add-points', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -370,7 +370,7 @@
         // =========================
         async function promoteUser(userId) {
             try {
-                const res = await fetch('/api/promote-user', {
+                const res = await fetch('/api/sa/promote-player', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
@@ -461,7 +461,7 @@
                 return;
             }
 
-            const res = await fetch('/api/withdraw-points-player', {
+            const res = await fetch('/api/sa/withdraw-points', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

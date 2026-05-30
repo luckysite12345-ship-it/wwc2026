@@ -20,6 +20,7 @@ const agentsRoutes = require('./routes/agents');
 const commissionLogsRoutes = require('./routes/commissionLogs');
 const onlinePlayersRoutes = require('./routes/onlinePlayers');
 const superadminAgentsRoutes = require('./routes/superadmin-agents');
+const superadminPlayers = require('./routes/superadminPlayers');
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 15 minutes
   max: 5, // allow max 5 attempts per window per IP
@@ -436,6 +437,7 @@ app.use('/api', agentsRoutes);
 app.use('/api', commissionLogsRoutes);
 app.use('/api', onlinePlayersRoutes);
 app.use('/api/superadmin', superadminAgentsRoutes);
+app.use('/api', superadminPlayers);
 // ==========================
 // AUTH MIDDLEWARE
 // ==========================
